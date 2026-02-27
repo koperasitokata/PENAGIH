@@ -110,3 +110,5 @@ export enum ViewMode {
   MUTATION = 'MUTATION',
   SAVINGS_WITHDRAWAL = 'SAVINGS_WITHDRAWAL'
 }
+
+export type ThemeType = 'default' | 'midnight' | 'sunset';
