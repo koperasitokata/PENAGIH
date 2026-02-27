@@ -15,9 +15,21 @@ interface HeaderProps {
   onRefresh: () => void;
   isRefreshing: boolean;
   petugas: PetugasProfile;
+  accentColor?: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ setView, currentView, hasNewNotifications, adminNotifications = [], onViewNotifications, onProfileClick, onRefresh, isRefreshing, petugas }) => {
+const Header: React.FC<HeaderProps> = ({ 
+  setView, 
+  currentView, 
+  hasNewNotifications, 
+  adminNotifications = [], 
+  onViewNotifications, 
+  onProfileClick, 
+  onRefresh, 
+  isRefreshing, 
+  petugas,
+  accentColor = 'text-emerald-400'
+}) => {
   const [showNotifications, setShowNotifications] = useState(false);
   
   const defaultNotifications = [
@@ -39,7 +51,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, hasNewNotificatio
   };
 
   return (
-    <header className="bg-slate-900/50 backdrop-blur-md text-white p-4 sticky top-0 z-[1100] border-b border-white/10">
+    <header className="text-white p-4 sticky top-0 z-[1100]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src={APP_CONFIG.LOGO_URL} alt="Logo" className={`${APP_CONFIG.LOGO_SIZE_HEADER} object-contain`} />
@@ -56,7 +68,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, hasNewNotificatio
             className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors"
             title="Muat Ulang Data"
           >
-            <RefreshCw size={16} className={`text-white/60 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+            <RefreshCw size={16} className={`text-white/60 ${isRefreshing ? `animate-spin ${accentColor}` : ''}`} />
           </motion.button>
 
           <motion.button 
@@ -79,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, hasNewNotificatio
                 className="absolute top-12 right-0 w-64 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[1200]"
               >
                 <div className="p-3 bg-white/5 border-b border-white/5 flex justify-between items-center">
-                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Pesan Admin Pusat</span>
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${accentColor}`}>Pesan Admin Pusat</span>
                   <button onClick={() => setShowNotifications(false)} className="text-[10px] text-white/20 hover:text-white">
                     <X size={12} />
                   </button>
@@ -99,12 +111,12 @@ const Header: React.FC<HeaderProps> = ({ setView, currentView, hasNewNotificatio
           <motion.button 
             whileTap={{ scale: 0.9 }}
             onClick={onProfileClick}
-            className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400/20 to-blue-500/20 flex items-center justify-center border border-emerald-400/30 overflow-hidden"
+            className={`w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden`}
           >
             {petugas.foto ? (
               <img src={petugas.foto} alt="Profile" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-[10px] font-black text-emerald-400 uppercase">{getInitials(petugas.nama)}</span>
+              <span className={`text-[10px] font-black ${accentColor} uppercase`}>{getInitials(petugas.nama)}</span>
             )}
           </motion.button>
         </div>
