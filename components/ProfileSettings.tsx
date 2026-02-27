@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { PetugasProfile } from '../types';
-import { X, Camera, Edit2, LogOut, User, Phone, Shield } from 'lucide-react';
+import { PetugasProfile, ThemeType } from '../types';
+import { X, Camera, Edit2, LogOut, User, Phone, Shield, Palette, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ProfileSettingsProps {
@@ -9,11 +9,28 @@ interface ProfileSettingsProps {
   onSave: (profile: PetugasProfile) => void;
   onLogout: () => void;
   onClose: () => void;
+  currentTheme: ThemeType;
+  onThemeChange: (theme: ThemeType) => void;
+  accentColor?: string;
 }
 
-const ProfileSettings: React.FC<ProfileSettingsProps> = ({ petugas, onSave, onLogout, onClose }) => {
+const ProfileSettings: React.FC<ProfileSettingsProps> = ({ 
+  petugas, 
+  onSave, 
+  onLogout, 
+  onClose,
+  currentTheme,
+  onThemeChange,
+  accentColor = 'text-emerald-400'
+}) => {
   const [photo, setPhoto] = useState<string | null>(petugas.foto || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const themes: { id: ThemeType; name: string; colors: string }[] = [
+    { id: 'default', name: 'Default', colors: 'bg-emerald-500' },
+    { id: 'midnight', name: 'Midnight', colors: 'bg-indigo-500' },
+    { id: 'sunset', name: 'Sunset', colors: 'bg-rose-500' },
+  ];
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,7 +76,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ petugas, onSave, onLo
         className="bg-slate-900 w-full max-w-sm rounded-[2.5rem] border border-white/10 shadow-3xl overflow-hidden"
       >
         <div className="p-6 bg-white/5 border-b border-white/5 flex justify-between items-center">
-          <h3 className="font-black text-sm uppercase tracking-widest text-emerald-400">Identitas Petugas</h3>
+          <h3 className={`font-black text-sm uppercase tracking-widest ${accentColor}`}>Identitas Petugas</h3>
           <button onClick={onClose} className="text-white/40">
             <X size={20} />
           </button>
@@ -69,7 +86,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ petugas, onSave, onLo
           <div className="flex flex-col items-center gap-4">
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="w-24 h-24 rounded-[2rem] bg-white/5 border-2 border-dashed border-emerald-400/30 flex items-center justify-center overflow-hidden cursor-pointer hover:bg-white/10 transition-all relative group"
+              className={`w-24 h-24 rounded-[2rem] bg-white/5 border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer hover:bg-white/10 transition-all relative group ${accentColor.replace('text', 'border')}/30`}
             >
               {photo ? (
                 <img src={photo} alt="Profile" className="w-full h-full object-cover" />
@@ -86,7 +103,7 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ petugas, onSave, onLo
 
           <div className="space-y-3">
             <div className="p-3 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3">
-               <User size={16} className="text-emerald-400" />
+               <User size={16} className={accentColor} />
                <div>
                   <p className="text-[7px] font-black text-white/20 uppercase tracking-widest">Nama</p>
                   <p className="text-xs font-bold text-white">{petugas.nama}</p>
@@ -94,15 +111,15 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ petugas, onSave, onLo
             </div>
             
             <div className="p-3 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3">
-               <Phone size={16} className="text-emerald-400" />
+               <Phone size={16} className={accentColor} />
                <div>
                   <p className="text-[7px] font-black text-white/20 uppercase tracking-widest">No. HP</p>
                   <p className="text-xs font-bold text-white">{petugas.no_hp}</p>
                </div>
             </div>
-
+ 
             <div className="p-3 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3">
-               <Shield size={16} className="text-emerald-400" />
+               <Shield size={16} className={accentColor} />
                <div>
                   <p className="text-[7px] font-black text-white/20 uppercase tracking-widest">Jabatan</p>
                   <p className="text-xs font-bold text-white">{petugas.jabatan}</p>
@@ -110,11 +127,38 @@ const ProfileSettings: React.FC<ProfileSettingsProps> = ({ petugas, onSave, onLo
             </div>
           </div>
 
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 px-1">
+              <Palette size={14} className="text-white/40" />
+              <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Pilih Tema Aplikasi</p>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {themes.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => onThemeChange(t.id)}
+                  className={`p-2 rounded-xl border transition-all flex flex-col items-center gap-2 ${
+                    currentTheme === t.id 
+                      ? 'bg-white/10 border-white/20' 
+                      : 'bg-white/5 border-transparent hover:bg-white/10'
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full ${t.colors} flex items-center justify-center shadow-lg`}>
+                    {currentTheme === t.id && <Check size={12} className="text-white" />}
+                  </div>
+                  <span className={`text-[8px] font-bold uppercase tracking-tighter ${currentTheme === t.id ? 'text-white' : 'text-white/40'}`}>
+                    {t.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="pt-4 space-y-3">
             <motion.button 
               whileTap={{ scale: 0.98 }}
               onClick={handleSave}
-              className="w-full py-4 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/20 transition-all"
+              className={`w-full py-4 ${accentColor.replace('text', 'bg')} text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all`}
             >
               Update Foto Profil
             </motion.button>
