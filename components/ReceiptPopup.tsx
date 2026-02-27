@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { PinjamanAktif, Nasabah } from '../types';
 import html2canvas from 'html2canvas';
-import { CheckCircle2, Download, X, QrCode, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { CheckCircle2, Download, X, QrCode, Loader2, Share2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { APP_CONFIG } from '../src/config';
 
 interface ReceiptPopupProps {
@@ -19,111 +20,100 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
 
   const handleDownload = async () => {
     setIsGenerating(true);
-
     const element = document.getElementById('receipt-card');
-
-    if (!element || typeof html2canvas === 'undefined') {
-      alert("Gagal generate gambar");
-      setIsGenerating(false);
-      return;
-    }
-
-    try {
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      // Tunggu semua gambar load
-      const images = element.getElementsByTagName('img');
-      await Promise.all(
-        Array.from(images).map(img => {
-          if (img.complete) return Promise.resolve();
-          return new Promise(resolve => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-        })
-      );
-
-      const canvas = await html2canvas(element, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        width: element.offsetWidth,
-        height: element.offsetHeight,
-        logging: false,
-        onclone: (doc) => {
-          const el = doc.getElementById('receipt-card');
-          if (el) el.style.borderRadius = '0';
-        }
-      });
-
-      const fileName = `STRUK-${nasabah.nama.replace(/\s+/g, '_')}.jpg`;
-
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          alert("Gagal membuat file");
-          setIsGenerating(false);
-          return;
-        }
-
-        const file = new File([blob], fileName, { type: 'image/jpeg' });
-
-        // 🔥 PRIORITAS: SHARE DI HP
-        if (navigator.share && navigator.canShare) {
-          try {
-            if (navigator.canShare({ files: [file] })) {
-              await navigator.share({
-                files: [file],
-                title: 'Struk Pembayaran',
-                text: `Struk: ${nasabah.nama}`
-              });
-              setIsGenerating(false);
-              return;
-            }
-          } catch (err) {
-            console.log("Share gagal / dibatalkan", err);
-          }
-        }
-
-        // 🔥 FALLBACK DOWNLOAD
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-
-        link.href = url;
-        link.download = fileName;
-
-        document.body.appendChild(link);
-        link.click();
-
-        setTimeout(() => {
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        }, 100);
-
-      }, 'image/jpeg', 0.85);
-
-    } catch (err) {
-      console.error("Gagal generate struk", err);
-
+    
+    if (element && typeof html2canvas !== 'undefined') {
       try {
+        // Ensure images are loaded
+        const images = element.getElementsByTagName('img');
+        await Promise.all(Array.from(images).map(img => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+          });
+        }));
+
         const canvas = await html2canvas(element, {
-          scale: 1,
-          backgroundColor: '#ffffff'
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          width: element.offsetWidth,
+          height: element.scrollHeight,
+          windowWidth: element.offsetWidth,
+          windowHeight: element.scrollHeight,
+          onclone: (clonedDoc) => {
+            const clonedElement = clonedDoc.getElementById('receipt-card');
+            if (clonedElement) {
+              clonedElement.style.transform = 'none';
+              clonedElement.style.borderRadius = '0';
+              clonedElement.style.maxHeight = 'none';
+              clonedElement.style.overflow = 'visible';
+              clonedElement.style.position = 'absolute';
+              clonedElement.style.top = '0';
+              clonedElement.style.left = '0';
+              clonedElement.style.width = `${element.offsetWidth}px`;
+              
+              // Remove any motion styles that might interfere
+              const motionDivs = clonedElement.querySelectorAll('div');
+              motionDivs.forEach(div => {
+                (div as HTMLElement).style.transform = 'none';
+                (div as HTMLElement).style.transition = 'none';
+              });
+            }
+          }
         });
+        
+        const filename = `STRUK-${nasabah.nama.replace(/\s+/g, '-')}-${Date.now()}.jpg`;
 
-        const image = canvas.toDataURL('image/jpeg', 0.6);
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            // Priority 1: Native Share (Best for Mobile Gallery)
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/jpeg' })] })) {
+              try {
+                const file = new File([blob], filename, { type: 'image/jpeg' });
+                await navigator.share({
+                  files: [file],
+                  title: 'Struk Pembayaran',
+                  text: `Struk Pembayaran ${nasabah.nama}`
+                });
+                setIsGenerating(false);
+                return;
+              } catch (shareErr) {
+                console.log("Share cancelled or failed, falling back to download", shareErr);
+              }
+            }
 
-        const link = document.createElement('a');
-        link.href = image;
-        link.download = `STRUK-${Date.now()}.jpg`;
-        link.click();
-
-      } catch (e) {
-        alert("Gagal total, silakan screenshot manual");
+            // Priority 2: Standard Download
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            setTimeout(() => {
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+              setIsGenerating(false);
+            }, 500);
+          } else {
+            throw new Error("Blob generation failed");
+          }
+        }, 'image/jpeg', 0.95);
+      } catch (err) {
+        console.error("Gagal generate struk", err);
+        alert("Gagal menyimpan gambar. Silakan coba lagi atau ambil tangkapan layar (screenshot).");
+        setIsGenerating(false);
       }
+    } else {
+      window.print();
+      setIsGenerating(false);
     }
-
-    setIsGenerating(false);
   };
 
   const timestampStr = new Date(date).toLocaleString('id-ID', {
@@ -132,78 +122,118 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
   });
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm print:p-0 print:bg-white">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        id="receipt-card"
-        className="bg-white w-full max-w-[320px] rounded-3xl overflow-hidden shadow-2xl flex flex-col"
+        id="receipt-card" 
+        className="bg-white w-full max-w-[320px] rounded-3xl overflow-hidden shadow-2xl flex flex-col print:shadow-none print:rounded-none print:max-w-none relative max-h-[90vh] overflow-y-auto"
+        style={{ backgroundColor: '#ffffff', color: '#111827' }}
       >
-        <div className="p-4 text-white flex flex-col items-center gap-1 bg-indigo-600">
-          <CheckCircle2 size={24} />
-          <h2 className="font-black text-sm uppercase">Setoran Berhasil</h2>
-          <p className="text-[10px]">
-            {APP_CONFIG.APP_NAME} {APP_CONFIG.APP_TAGLINE}
-          </p>
+        <div 
+          className="p-4 text-white flex flex-col items-center gap-1 print:bg-white print:text-black print:border-b print:border-black"
+          style={{ background: 'linear-gradient(to right, #4f46e5, #2563eb)' }}
+        >
+          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center" style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}>
+            <CheckCircle2 size={24} />
+          </div>
+          <h2 className="font-black text-sm tracking-[0.2em] uppercase">Setoran Berhasil</h2>
+          <p className="text-[8px] font-bold opacity-70 tracking-widest">{APP_CONFIG.APP_NAME} {APP_CONFIG.APP_TAGLINE}</p>
         </div>
 
-        <div className="p-5 space-y-4 bg-white">
-          <div className="text-center">
-            <p className="text-sm font-bold">Rp {amountPaid.toLocaleString()}</p>
+        {/* Receipt Content - Indomaret/BRILink Style */}
+        <div className="p-5 flex-1 space-y-4 print:p-4 bg-[url('https://www.transparenttextures.com/patterns/paper-fibers.png')]" style={{ backgroundColor: '#ffffff' }}>
+          <div className="text-center space-y-1">
+            <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#9ca3af' }}>Struk Pembayaran Angsuran</p>
+            <p className="text-xl font-black tracking-tighter" style={{ color: '#111827' }}>Rp {amountPaid.toLocaleString()}</p>
+            <div className="flex items-center justify-center gap-2">
+              <span className="h-[1px] flex-1" style={{ backgroundColor: '#e5e7eb' }}></span>
+              <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: '#d1d5db' }}>Detail Transaksi</span>
+              <span className="h-[1px] flex-1" style={{ backgroundColor: '#e5e7eb' }}></span>
+            </div>
           </div>
 
-          <div className="text-sm space-y-1">
-            <div className="flex justify-between">
-              <span>Nasabah</span>
-              <span>{nasabah.nama}</span>
+          <div className="space-y-2 font-mono">
+            <div className="flex justify-between text-[10px] leading-tight">
+              <span className="uppercase" style={{ color: '#6b7280' }}>Nasabah</span>
+              <span className="font-bold text-right truncate ml-4" style={{ color: '#111827' }}>{nasabah.nama}</span>
             </div>
-            <div className="flex justify-between">
-              <span>ID</span>
-              <span>{record.id_pinjaman}</span>
+            <div className="flex justify-between text-[10px] leading-tight">
+              <span className="uppercase" style={{ color: '#6b7280' }}>ID Pinjam</span>
+              <span className="font-bold" style={{ color: '#111827' }}>{record.id_pinjaman}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Waktu</span>
-              <span>{timestampStr}</span>
+            <div className="flex justify-between text-[10px] leading-tight">
+              <span className="uppercase" style={{ color: '#6b7280' }}>Waktu Bayar</span>
+              <span className="font-bold" style={{ color: '#111827' }}>{timestampStr}</span>
             </div>
-            <div className="flex justify-between">
-              <span>Sisa</span>
-              <span>Rp {record.sisa_hutang.toLocaleString()}</span>
+            <div className="border-t border-dashed my-1.5" style={{ borderColor: '#d1d5db' }}></div>
+            <div className="flex justify-between text-[10px] leading-tight">
+              <span className="uppercase" style={{ color: '#6b7280' }}>Sisa Tagihan</span>
+              <span className="font-black" style={{ color: '#dc2626' }}>Rp {record.sisa_hutang.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-[10px] leading-tight">
+              <span className="uppercase" style={{ color: '#6b7280' }}>Ref ID</span>
+              <span style={{ color: '#9ca3af' }}>#{nasabah.nik.slice(-8)}</span>
             </div>
           </div>
 
           {photo && (
-            <img
-              src={photo}
-              alt="Bukti"
-              className="w-full h-32 object-cover rounded"
-              crossOrigin="anonymous"
-            />
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="h-[1px] flex-1" style={{ backgroundColor: '#f3f4f6' }}></div>
+                <p className="text-[7px] font-black uppercase tracking-widest" style={{ color: '#d1d5db' }}>Lampiran Bukti</p>
+                <div className="h-[1px] flex-1" style={{ backgroundColor: '#f3f4f6' }}></div>
+              </div>
+              <div className="w-full h-36 rounded-xl overflow-hidden border-2 shadow-inner" style={{ borderColor: '#f9fafb' }}>
+                <img src={photo} alt="Bukti" className="w-full h-full object-cover" crossOrigin="anonymous" />
+              </div>
+            </div>
           )}
 
-          <div className="flex flex-col items-center">
-            <QrCode size={32} />
-            <p className="text-xs">Terima kasih</p>
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <div className="p-1.5 bg-white border rounded-lg shadow-sm" style={{ borderColor: '#f3f4f6' }}>
+               <QrCode size={32} className="opacity-80" style={{ color: '#111827' }} />
+            </div>
+            <div className="text-center">
+              <p className="text-[7px] font-black uppercase tracking-[0.3em]" style={{ color: '#9ca3af' }}>
+                Terima Kasih Atas Pembayaran Anda
+              </p>
+            </div>
           </div>
         </div>
 
-        <div className="p-4 flex gap-2" data-html2canvas-ignore="true">
-          <button
+        {/* Action Buttons */}
+        <div className="p-4 bg-gray-50 flex gap-2 print:hidden border-t border-gray-100" data-html2canvas-ignore="true">
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
             onClick={handleDownload}
             disabled={isGenerating}
-            className="flex-1 bg-indigo-600 text-white py-2 rounded flex items-center justify-center gap-2"
+            className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
           >
-            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {isGenerating ? 'Proses...' : 'Download'}
-          </button>
-
-          <button
+            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+            {isGenerating ? 'Memproses...' : 'Simpan / Bagikan'}
+          </motion.button>
+          <motion.button 
+            whileTap={{ scale: 0.95 }}
             onClick={onClose}
-            className="w-10 bg-gray-200 rounded flex items-center justify-center"
+            className="w-12 bg-white border border-gray-200 text-gray-400 rounded-xl flex items-center justify-center transition-all hover:bg-gray-100"
           >
-            <X size={16} />
-          </button>
+            <X size={18} />
+          </motion.button>
         </div>
+
+        {/* Zigzag Bottom Effect */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 flex print:hidden overflow-hidden translate-y-full" style={{ backgroundImage: 'radial-gradient(circle, transparent 70%, #f9fafb 70%)', backgroundSize: '10px 10px' }}></div>
       </motion.div>
+
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .print\\:block, .print\\:block * { visibility: visible; }
+          .fixed { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block !important; }
+          .bg-black\\/80 { background: white !important; }
+        }
+      `}</style>
     </div>
   );
 };
