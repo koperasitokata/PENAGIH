@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { PinjamanAktif, GeoLocation, Nasabah } from '../types';
 import { Html5Qrcode } from 'html5-qrcode';
-import { X, Camera, CheckCircle, AlertTriangle, MapPin, Loader2, Image as ImageIcon } from 'lucide-react';
+import { X, Camera, CheckCircle, AlertTriangle, MapPin, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface CollectionFormProps {
@@ -16,8 +16,6 @@ interface CollectionFormProps {
 const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, prefillName, onSubmit, onCancel }) => {
   const [qrVerified, setQrVerified] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
-  const [isScanningFile, setIsScanningFile] = useState(false);
-  const [isCameraMode, setIsCameraMode] = useState(true);
   const [customerName, setCustomerName] = useState(prefillName || '');
   const [amount, setAmount] = useState('');
   const [photo, setPhoto] = useState<string | null>(null);
@@ -39,26 +37,6 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
     if (!activeNasabah) return null;
     return records.find(r => r.id_nasabah === activeNasabah.id_nasabah && r.status === 'Aktif');
   }, [activeNasabah, records]);
-
-  const handleFileScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      setIsScanningFile(true);
-      setQrError(null);
-      
-      const html5QrCode = new Html5Qrcode("reader-hidden");
-      const decodedText = await html5QrCode.scanFile(file, true);
-      
-      handleQrSuccess(decodedText);
-    } catch (err) {
-      console.error("File scan error:", err);
-      setQrError("Gagal membaca QR Code dari gambar. Pastikan gambar jelas.");
-    } finally {
-      setIsScanningFile(false);
-    }
-  };
 
   const handleQrSuccess = (decodedText: string) => {
     const scannedCode = decodedText.trim();
@@ -97,7 +75,7 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
 
   // Efek Kamera
   useEffect(() => {
-    if (!qrVerified && isCameraMode && !isScanningFile) {
+    if (!qrVerified) {
       const html5QrCode = new Html5Qrcode("reader-camera");
       html5QrCodeRef.current = html5QrCode;
       
@@ -114,7 +92,6 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
         }
       ).catch(err => {
         console.error("Camera start error:", err);
-        setIsCameraMode(false); // Fallback ke file jika kamera gagal
       });
 
       return () => {
@@ -123,7 +100,7 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
         }
       };
     }
-  }, [qrVerified, isCameraMode, isScanningFile]);
+  }, [qrVerified]);
 
   // Efek GPS
   useEffect(() => {
@@ -232,15 +209,9 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
         <div className="flex items-center justify-between mb-8">
            <div>
               <h2 className="text-2xl font-black text-white">Validasi QR</h2>
-              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-[0.2em]">{isCameraMode ? 'Scan Menggunakan Kamera' : 'Ambil dari Galeri Foto'}</p>
+              <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-[0.2em]">Scan Menggunakan Kamera</p>
            </div>
            <div className="flex gap-2">
-             <button 
-               onClick={() => setIsCameraMode(!isCameraMode)} 
-               className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isCameraMode ? 'bg-emerald-500 text-white' : 'bg-white/5 text-white/40'}`}
-             >
-               <Camera size={20} />
-             </button>
              <button onClick={onCancel} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
                <X size={20} />
              </button>
@@ -263,52 +234,23 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
              )}
            </AnimatePresence>
 
-           {isCameraMode ? (
-             <div className="w-full aspect-square max-w-[320px] rounded-[3rem] border-4 border-emerald-500/30 bg-black relative overflow-hidden shadow-2xl shadow-emerald-500/10">
-               <div id="reader-camera" className="w-full h-full"></div>
-               <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none"></div>
-               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-500 rounded-2xl pointer-events-none">
-                 <motion.div 
-                   animate={{ top: ['0%', '100%', '0%'] }}
-                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                   className="absolute left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)]"
-                 />
-               </div>
+           <div className="w-full aspect-square max-w-[320px] rounded-[3rem] border-4 border-emerald-500/30 bg-black relative overflow-hidden shadow-2xl shadow-emerald-500/10">
+             <div id="reader-camera" className="w-full h-full"></div>
+             <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none"></div>
+             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-500 rounded-2xl pointer-events-none">
+               <motion.div 
+                 animate={{ top: ['0%', '100%', '0%'] }}
+                 transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                 className="absolute left-0 right-0 h-0.5 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.8)]"
+               />
              </div>
-           ) : (
-             <div 
-               onClick={() => !isScanningFile && fileInputRef.current?.click()}
-               className="w-full aspect-square max-w-[280px] rounded-[3rem] border-4 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center cursor-pointer hover:bg-white/10 transition-all relative group overflow-hidden"
-             >
-                {isScanningFile ? (
-                  <div className="flex flex-col items-center gap-4">
-                    <Loader2 size={48} className="text-emerald-500 animate-spin" />
-                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Menganalisa Gambar...</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="w-20 h-20 rounded-3xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                      <ImageIcon size={40} className="text-emerald-400" />
-                    </div>
-                    <p className="text-xs font-black text-white uppercase tracking-widest mb-2">Pilih Foto QR</p>
-                    <p className="text-[9px] font-bold text-white/20 uppercase tracking-[0.2em] text-center px-10">Ambil screenshot atau foto QR NIK dari galeri</p>
-                  </>
-                )}
-             </div>
-           )}
+           </div>
            
            <div id="reader-hidden" className="hidden"></div>
-           <input 
-             type="file" 
-             ref={fileInputRef} 
-             onChange={handleFileScan} 
-             accept="image/*" 
-             className="hidden" 
-           />
 
            <div className="text-center">
               <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.3em] leading-relaxed max-w-[200px]">
-                {isCameraMode ? 'Arahkan kamera ke QR Code NIK Nasabah untuk validasi otomatis.' : 'Sistem akan memindai QR Code secara otomatis dari gambar yang Anda pilih.'}
+                Arahkan kamera ke QR Code NIK Nasabah untuk validasi otomatis.
               </p>
            </div>
         </div>
