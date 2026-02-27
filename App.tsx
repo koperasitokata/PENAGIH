@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { PinjamanAktif, ViewMode, PengajuanPinjaman, PetugasProfile, Nasabah, Prospect, Mutation } from './types';
+import { PinjamanAktif, ViewMode, PengajuanPinjaman, PetugasProfile, Nasabah, Prospect, Mutation, ThemeType } from './types';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import CollectionForm from './components/CollectionForm';
@@ -17,6 +17,36 @@ import Login from './components/Login';
 import { ApiService } from './ApiService';
 import { Home, FileSignature, Camera, Users, Map as MapIcon, Loader2, AlertCircle, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+const THEMES = {
+  default: {
+    bg: 'bg-slate-950',
+    gradient: 'from-blue-900/20 via-transparent to-emerald-900/20',
+    glow1: 'bg-blue-500/10',
+    glow2: 'bg-emerald-500/10',
+    navIcon: 'text-emerald-400',
+    button: 'from-emerald-400 to-blue-500',
+    shadow: 'shadow-emerald-500/30'
+  },
+  midnight: {
+    bg: 'bg-gray-950',
+    gradient: 'from-indigo-900/30 via-transparent to-purple-900/30',
+    glow1: 'bg-indigo-500/15',
+    glow2: 'bg-purple-500/15',
+    navIcon: 'text-indigo-400',
+    button: 'from-indigo-500 to-purple-600',
+    shadow: 'shadow-indigo-500/30'
+  },
+  sunset: {
+    bg: 'bg-stone-950',
+    gradient: 'from-amber-900/20 via-transparent to-rose-900/20',
+    glow1: 'bg-amber-500/10',
+    glow2: 'bg-rose-500/10',
+    navIcon: 'text-rose-400',
+    button: 'from-amber-500 to-rose-500',
+    shadow: 'shadow-rose-500/30'
+  }
+};
 
 const App: React.FC = () => {
   // Hapus penyimpanan lokal karena membuat data stuck dan tidak sinkron
@@ -36,6 +66,15 @@ const App: React.FC = () => {
   const [lastTransaction, setLastTransaction] = useState<any | null>(null);
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<ThemeType>(() => {
+    return (localStorage.getItem('app_theme') as ThemeType) || 'default';
+  });
+
+  const activeTheme = THEMES[currentTheme];
+
+  useEffect(() => {
+    localStorage.setItem('app_theme', currentTheme);
+  }, [currentTheme]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -657,7 +696,12 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col max-w-md mx-auto bg-slate-950 text-white shadow-2xl relative border-x border-white/10 overflow-hidden">
+    <div className={`h-screen flex flex-col max-w-md mx-auto ${activeTheme.bg} text-white shadow-2xl relative border-x border-white/10 overflow-hidden`}>
+      {/* Background Decorations like Login */}
+      <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${activeTheme.gradient} z-0 pointer-events-none`}></div>
+      <div className={`absolute -top-24 -left-24 w-96 h-96 ${activeTheme.glow1} blur-[120px] rounded-full pointer-events-none`}></div>
+      <div className={`absolute -bottom-24 -right-24 w-96 h-96 ${activeTheme.glow2} blur-[120px] rounded-full pointer-events-none`}></div>
+
       <Header 
         setView={setView} 
         currentView={view} 
@@ -668,9 +712,10 @@ const App: React.FC = () => {
         onRefresh={handleRefresh}
         isRefreshing={isRefreshing}
         petugas={petugas}
+        accentColor={activeTheme.navIcon}
       />
       
-      <main className="flex-1 overflow-y-auto pb-24 relative scroll-smooth">
+      <main className="flex-1 overflow-y-auto pb-28 relative scroll-smooth z-10">
         <AnimatePresence mode="wait">
           {view === ViewMode.MAP ? (
             <motion.div key="map" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 top-16 bottom-20 z-0 bg-slate-900">
@@ -691,6 +736,7 @@ const App: React.FC = () => {
                     setView={setView} 
                     onSelectTarget={handleGoToForm} 
                     collector={petugas} 
+                    accentColor={activeTheme.navIcon}
                   />
                 </motion.div>
               )}
@@ -806,31 +852,31 @@ const App: React.FC = () => {
         </AnimatePresence>
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-slate-900/80 backdrop-blur-2xl border-t border-white/10 flex justify-around items-center h-20 z-[1001]">
-        <button onClick={() => setView(ViewMode.DASHBOARD)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.DASHBOARD ? 'text-emerald-400' : 'text-white/40'}`}>
-          <Home size={20} />
-          <span className="text-[9px] mt-1 font-bold uppercase tracking-wider">Home</span>
+      <nav className="fixed bottom-6 left-4 right-4 max-w-[calc(448px-2rem)] mx-auto bg-slate-900/60 backdrop-blur-3xl border border-white/10 flex justify-around items-center h-18 z-[1001] rounded-[2.5rem] shadow-2xl shadow-black/50">
+        <button onClick={() => setView(ViewMode.DASHBOARD)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.DASHBOARD ? activeTheme.navIcon : 'text-white/40'}`}>
+          <Home size={18} />
+          <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Home</span>
         </button>
-        <button onClick={() => setView(ViewMode.SUBMISSION)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.SUBMISSION ? 'text-emerald-400' : 'text-white/40'}`}>
-          <FileSignature size={20} />
-          <span className="text-[9px] mt-1 font-bold uppercase tracking-wider">Ajuan</span>
+        <button onClick={() => setView(ViewMode.SUBMISSION)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.SUBMISSION ? activeTheme.navIcon : 'text-white/40'}`}>
+          <FileSignature size={18} />
+          <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Ajuan</span>
         </button>
         <button onClick={() => handleGoToForm()} className="flex flex-col items-center justify-center w-full h-full">
           <motion.div 
             whileTap={{ scale: 0.9 }}
-            className="bg-gradient-to-br from-emerald-400 to-blue-500 text-white w-14 h-14 rounded-2xl flex items-center justify-center -mt-10 shadow-xl shadow-emerald-500/30 border-4 border-slate-900"
+            className={`bg-gradient-to-br ${activeTheme.button} text-white w-14 h-14 rounded-full flex items-center justify-center -mt-12 shadow-xl ${activeTheme.shadow} border-4 border-slate-950`}
           >
             <Camera size={24} />
           </motion.div>
-          <span className={`text-[9px] mt-1 font-bold uppercase tracking-wider ${view === ViewMode.FORM ? 'text-emerald-400' : 'text-white/40'}`}>Input</span>
+          <span className={`text-[8px] mt-1 font-bold uppercase tracking-wider ${view === ViewMode.FORM ? activeTheme.navIcon : 'text-white/40'}`}>Input</span>
         </button>
-        <button onClick={() => setView(ViewMode.CUSTOMER_LIST)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.CUSTOMER_LIST || view === ViewMode.INSTALLMENT_CARD ? 'text-emerald-400' : 'text-white/40'}`}>
-          <Users size={20} />
-          <span className="text-[9px] mt-1 font-bold uppercase tracking-wider">Nasabah</span>
+        <button onClick={() => setView(ViewMode.CUSTOMER_LIST)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.CUSTOMER_LIST || view === ViewMode.INSTALLMENT_CARD ? activeTheme.navIcon : 'text-white/40'}`}>
+          <Users size={18} />
+          <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Nasabah</span>
         </button>
-        <button onClick={() => setView(ViewMode.MAP)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.MAP ? 'text-emerald-400' : 'text-white/40'}`}>
-          <MapIcon size={20} />
-          <span className="text-[9px] mt-1 font-bold uppercase tracking-wider">Peta</span>
+        <button onClick={() => setView(ViewMode.MAP)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.MAP ? activeTheme.navIcon : 'text-white/40'}`}>
+          <MapIcon size={18} />
+          <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Peta</span>
         </button>
       </nav>
 
@@ -852,6 +898,9 @@ const App: React.FC = () => {
             onSave={handleSaveProfile} 
             onLogout={handleLogout}
             onClose={() => setShowProfileSettings(false)} 
+            currentTheme={currentTheme}
+            onThemeChange={setCurrentTheme}
+            accentColor={activeTheme.navIcon}
           />
         )}
       </AnimatePresence>
