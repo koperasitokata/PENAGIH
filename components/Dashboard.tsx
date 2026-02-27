@@ -14,6 +14,7 @@ interface DashboardProps {
   setView: (view: ViewMode) => void;
   onSelectTarget: (name: string) => void;
   collector: PetugasProfile;
+  accentColor?: string;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ 
@@ -22,7 +23,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   mutations = [],
   setView, 
   onSelectTarget, 
-  collector 
+  collector,
+  accentColor = 'text-emerald-400'
 }) => {
   const now = new Date();
   
@@ -181,12 +183,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     >
       <section className="px-1 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center overflow-hidden text-emerald-400">
-            {collector.foto ? <img src={collector.foto} alt="Profile" className="w-full h-full object-cover" /> : <User size={20} />}
-          </div>
           <div>
             <h2 className="text-lg font-black text-white tracking-tight leading-none">{collector.nama}</h2>
-            <p className="text-[7px] text-white/40 font-bold uppercase tracking-[0.2em] mt-1">SINKRONISASI AKTIF</p>
+            <p className={`text-[7px] ${accentColor} font-bold uppercase tracking-[0.2em] mt-1`}>SINKRONISASI AKTIF</p>
           </div>
         </div>
         <div className="bg-white/5 px-3 py-1 rounded-xl border border-white/10 text-right">
@@ -196,9 +195,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       </section>
 
       <div className="grid grid-cols-3 gap-2">
-        <section className="bg-slate-900/40 border border-emerald-500/20 p-2 rounded-2xl flex flex-col justify-between shadow-lg h-24">
+        <section className="bg-slate-900/40 border border-white/10 p-2 rounded-2xl flex flex-col justify-between shadow-lg h-24">
           <div className="flex items-center gap-1.5">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${hasClaimedTransport ? 'bg-emerald-500/20 text-emerald-400' : isWeekend ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/20'}`}>
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${hasClaimedTransport ? `${accentColor.replace('text', 'bg')}/20 ${accentColor}` : isWeekend ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/20'}`}>
               {hasClaimedTransport ? <Check size={12} /> : isWeekend ? <CalendarX size={12} /> : <Bike size={12} />}
             </div>
             <div className="min-w-0">
@@ -214,10 +213,10 @@ const Dashboard: React.FC<DashboardProps> = ({
             disabled={hasClaimedTransport || isTransportLoading || isWeekend} 
             className={`w-full py-1.5 rounded-lg text-[7px] font-black uppercase tracking-widest transition-all ${
               hasClaimedTransport 
-                ? 'bg-emerald-500/10 text-emerald-500' 
+                ? `${accentColor.replace('text', 'bg')}/10 ${accentColor}` 
                 : isWeekend 
                   ? 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
-                  : 'bg-emerald-500 text-white shadow-lg'
+                  : `${accentColor.replace('text', 'bg')} text-white shadow-lg`
             }`}
           >
             {isTransportLoading ? '...' : hasClaimedTransport ? 'CLAIMED' : isWeekend ? 'LIBUR' : 'AMBIL'}
@@ -273,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <p className="text-xl font-black text-white">Rp {totalAmount.toLocaleString('id-ID')}</p>
           </div>
           <div className="text-right">
-            <div className="flex items-center gap-1 text-emerald-400">
+            <div className={`flex items-center gap-1 ${accentColor}`}>
               <TrendingUp size={14} />
               <span className="text-2xl font-black">{targetPercentage}%</span>
             </div>
@@ -284,7 +283,7 @@ const Dashboard: React.FC<DashboardProps> = ({
              initial={{ width: 0 }}
              animate={{ width: `${targetPercentage}%` }}
              transition={{ duration: 1 }}
-             className="h-full bg-emerald-500"
+             className={`h-full ${accentColor.replace('text', 'bg')}`}
            />
         </div>
       </section>
@@ -332,7 +331,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <span className={`text-[8px] font-black px-3 py-1.5 rounded-xl border shadow-lg ${
                     target.isOverdue 
                       ? 'bg-red-500 text-white border-red-500 shadow-red-500/20' 
-                      : 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20'
+                      : `${accentColor.replace('text', 'bg')}/20 ${accentColor} ${accentColor.replace('text', 'border')}/20`
                   }`}>
                     TAGIH {Math.round(target.cicilan / 1000)}K
                   </span>
