@@ -1,0 +1,116 @@
+
+import React, { useState } from 'react';
+import { ViewMode, PetugasProfile } from '../types';
+import { Bell, RefreshCw, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { APP_CONFIG } from '../src/config';
+
+interface HeaderProps {
+  setView: (view: ViewMode) => void;
+  currentView: ViewMode;
+  hasNewNotifications: boolean;
+  adminNotifications?: {id: number, text: string, time: string}[];
+  onViewNotifications: () => void;
+  onProfileClick: () => void;
+  onRefresh: () => void;
+  isRefreshing: boolean;
+  petugas: PetugasProfile;
+}
+
+const Header: React.FC<HeaderProps> = ({ setView, currentView, hasNewNotifications, adminNotifications = [], onViewNotifications, onProfileClick, onRefresh, isRefreshing, petugas }) => {
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  const defaultNotifications = [
+    { id: 99, text: "Selamat datang di sistem TOKATA.", time: "Hari ini" }
+  ];
+
+  const activeNotifications = adminNotifications.length > 0 ? adminNotifications : defaultNotifications;
+
+  const handleToggleNotifications = () => {
+    if (!showNotifications) {
+      onViewNotifications();
+    }
+    setShowNotifications(!showNotifications);
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return "??";
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+  };
+
+  return (
+    <header className="bg-slate-900/50 backdrop-blur-md text-white p-4 sticky top-0 z-[1100] border-b border-white/10">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img src={APP_CONFIG.LOGO_URL} alt="Logo" className={`${APP_CONFIG.LOGO_SIZE_HEADER} object-contain`} />
+          <div>
+            <h1 className="font-black text-xl leading-none tracking-tight">{APP_CONFIG.APP_NAME}</h1>
+            <p className="text-[8px] text-white/50 uppercase tracking-[0.2em] font-black mt-1">{APP_CONFIG.APP_TAGLINE}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 relative">
+          <motion.button 
+            whileTap={{ scale: 0.9 }}
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors"
+            title="Muat Ulang Data"
+          >
+            <RefreshCw size={16} className={`text-white/60 ${isRefreshing ? 'animate-spin text-emerald-400' : ''}`} />
+          </motion.button>
+
+          <motion.button 
+            whileTap={{ scale: 0.9 }}
+            onClick={handleToggleNotifications}
+            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors relative"
+          >
+            <Bell size={16} className="text-white/60" />
+            {hasNewNotifications && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
+            )}
+          </motion.button>
+          
+          <AnimatePresence>
+            {showNotifications && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-12 right-0 w-64 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[1200]"
+              >
+                <div className="p-3 bg-white/5 border-b border-white/5 flex justify-between items-center">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-emerald-400">Pesan Admin Pusat</span>
+                  <button onClick={() => setShowNotifications(false)} className="text-[10px] text-white/20 hover:text-white">
+                    <X size={12} />
+                  </button>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  {activeNotifications.map(notif => (
+                    <div key={notif.id} className="p-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
+                      <p className="text-[10px] font-medium text-white/80 leading-relaxed mb-1">{notif.text}</p>
+                      <p className="text-[8px] font-bold text-white/20 uppercase">{notif.time}</p>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <motion.button 
+            whileTap={{ scale: 0.9 }}
+            onClick={onProfileClick}
+            className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400/20 to-blue-500/20 flex items-center justify-center border border-emerald-400/30 overflow-hidden"
+          >
+            {petugas.foto ? (
+              <img src={petugas.foto} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-[10px] font-black text-emerald-400 uppercase">{getInitials(petugas.nama)}</span>
+            )}
+          </motion.button>
+        </div>
+      </div>
+    </header>
+  );
+};
+
+export default Header;
