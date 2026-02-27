@@ -14,49 +14,79 @@ interface ReceiptPopupProps {
   onClose: () => void;
 }
 
-const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid, photo, date, onClose }) => {
+const ReceiptPopup: React.FC<ReceiptPopupProps> = ({
+  record,
+  nasabah,
+  amountPaid,
+  photo,
+  date,
+  onClose
+}) => {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const handleDownload = async () => {
-    setIsGenerating(true);
-    const element = document.getElementById('receipt-card');
+    if (isGenerating) return;
 
-    if (!element) {
-      setIsGenerating(false);
-      return;
-    }
+    setIsGenerating(true);
 
     try {
-      // Tunggu render stabil
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const element = document.getElementById('receipt-card');
+      if (!element) throw new Error('Element tidak ditemukan');
 
-      // Pastikan semua gambar sudah load
-      const images = element.getElementsByTagName('img');
-      await Promise.all(Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = resolve; // jangan reject biar tetap lanjut
-        });
-      }));
+      // 🔥 FIX 1: clone element supaya tidak kena scroll / animasi
+      const cloned = element.cloneNode(true) as HTMLElement;
+      cloned.style.position = 'fixed';
+      cloned.style.top = '0';
+      cloned.style.left = '0';
+      cloned.style.width = '320px';
+      cloned.style.zIndex = '99999';
+      cloned.style.transform = 'none';
+      cloned.style.maxHeight = 'none';
+      cloned.style.overflow = 'visible';
+      cloned.style.background = '#ffffff';
 
-      const canvas = await html2canvas(element, {
+      document.body.appendChild(cloned);
+
+      // 🔥 FIX 2: tunggu render stabil
+      await new Promise((r) => setTimeout(r, 500));
+
+      // 🔥 FIX 3: tunggu semua gambar
+      const images = cloned.getElementsByTagName('img');
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      // 🔥 FIX 4: render canvas aman
+      const canvas = await html2canvas(cloned, {
         scale: 2,
         useCORS: true,
         allowTaint: false,
         backgroundColor: '#ffffff',
         logging: false,
-        onclone: (clonedDoc) => {
-          const clonedElement = clonedDoc.getElementById('receipt-card');
-          if (clonedElement) {
-            clonedElement.style.transform = 'none';
-            clonedElement.style.borderRadius = '0';
-          }
-        }
+        windowWidth: 400,
       });
 
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      // 🔥 FIX 5: convert lebih stabil
+      let dataUrl = '';
+      try {
+        dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+      } catch {
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, 'image/jpeg', 0.95)
+        );
 
+        if (!blob) throw new Error('Gagal convert blob');
+
+        dataUrl = URL.createObjectURL(blob);
+      }
+
+      // 🔥 FIX 6: download aman
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = `STRUK-${nasabah.nama.replace(/\s+/g, '-')}-${Date.now()}.jpg`;
@@ -65,124 +95,115 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
       link.click();
       document.body.removeChild(link);
 
+      // cleanup blob url
+      if (dataUrl.startsWith('blob:')) {
+        setTimeout(() => URL.revokeObjectURL(dataUrl), 1000);
+      }
+
+      // hapus clone
+      document.body.removeChild(cloned);
+
     } catch (err) {
-      console.error("Gagal generate struk", err);
-      alert("Gagal menyimpan gambar. Silakan coba lagi atau screenshot.");
+      console.error('ERROR DOWNLOAD:', err);
+      alert('Gagal menyimpan gambar. Coba ulang atau screenshot.');
     }
 
     setIsGenerating(false);
   };
 
   const timestampStr = new Date(date).toLocaleString('id-ID', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit'
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
   });
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm print:p-0 print:bg-white">
-      <motion.div 
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
+      <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        id="receipt-card" 
-        className="bg-white w-full max-w-[320px] rounded-3xl overflow-hidden shadow-2xl flex flex-col print:shadow-none print:rounded-none print:max-w-none relative max-h-[90vh] overflow-y-auto"
-        style={{ backgroundColor: '#ffffff', color: '#111827' }}
+        id="receipt-card"
+        className="bg-white w-full max-w-[320px] rounded-3xl overflow-hidden shadow-2xl flex flex-col relative"
       >
-        <div 
-          className="p-4 text-white flex flex-col items-center gap-1 print:bg-white print:text-black print:border-b print:border-black"
-          style={{ background: 'linear-gradient(to right, #4f46e5, #2563eb)' }}
-        >
+        <div className="p-4 text-white flex flex-col items-center gap-1 bg-gradient-to-r from-indigo-600 to-blue-600">
           <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
             <CheckCircle2 size={24} />
           </div>
-          <h2 className="font-black text-sm tracking-[0.2em] uppercase">Setoran Berhasil</h2>
-          <p className="text-[8px] font-bold opacity-70 tracking-widest">
+          <h2 className="font-black text-sm uppercase tracking-widest">
+            Setoran Berhasil
+          </h2>
+          <p className="text-[8px] opacity-70">
             {APP_CONFIG.APP_NAME} {APP_CONFIG.APP_TAGLINE}
           </p>
         </div>
 
-        {/* FIX: HAPUS background external */}
-        <div className="p-5 flex-1 space-y-4 print:p-4" style={{ backgroundColor: '#ffffff' }}>
-          <div className="text-center space-y-1">
-            <p className="text-[9px] font-bold uppercase tracking-widest" style={{ color: '#9ca3af' }}>
+        <div className="p-5 space-y-4 bg-white">
+          <div className="text-center">
+            <p className="text-xs text-gray-400">
               Struk Pembayaran Angsuran
             </p>
-            <p className="text-xl font-black tracking-tighter" style={{ color: '#111827' }}>
+            <p className="text-xl font-bold">
               Rp {amountPaid.toLocaleString()}
             </p>
-            <div className="flex items-center justify-center gap-2">
-              <span className="h-[1px] flex-1" style={{ backgroundColor: '#e5e7eb' }}></span>
-              <span className="text-[7px] font-black uppercase tracking-widest" style={{ color: '#d1d5db' }}>
-                Detail Transaksi
-              </span>
-              <span className="h-[1px] flex-1" style={{ backgroundColor: '#e5e7eb' }}></span>
-            </div>
           </div>
 
-          <div className="space-y-2 font-mono">
-            <div className="flex justify-between text-[10px]">
-              <span style={{ color: '#6b7280' }}>Nasabah</span>
-              <span className="font-bold">{nasabah.nama}</span>
+          <div className="text-xs space-y-1">
+            <div className="flex justify-between">
+              <span>Nasabah</span>
+              <span>{nasabah.nama}</span>
             </div>
-            <div className="flex justify-between text-[10px]">
-              <span style={{ color: '#6b7280' }}>ID Pinjam</span>
-              <span className="font-bold">{record.id_pinjaman}</span>
+            <div className="flex justify-between">
+              <span>ID</span>
+              <span>{record.id_pinjaman}</span>
             </div>
-            <div className="flex justify-between text-[10px]">
-              <span style={{ color: '#6b7280' }}>Waktu Bayar</span>
-              <span className="font-bold">{timestampStr}</span>
+            <div className="flex justify-between">
+              <span>Waktu</span>
+              <span>{timestampStr}</span>
             </div>
-
-            <div className="border-t border-dashed my-2"></div>
-
-            <div className="flex justify-between text-[10px]">
-              <span style={{ color: '#6b7280' }}>Sisa Tagihan</span>
-              <span className="font-black text-red-600">
-                Rp {record.sisa_hutang.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex justify-between text-[10px]">
-              <span style={{ color: '#6b7280' }}>Ref ID</span>
-              <span>#{nasabah.nik.slice(-8)}</span>
+            <div className="flex justify-between text-red-600 font-bold">
+              <span>Sisa</span>
+              <span>Rp {record.sisa_hutang.toLocaleString()}</span>
             </div>
           </div>
 
           {photo && (
-            <div className="pt-2">
-              <img
-                src={photo}
-                alt="Bukti"
-                className="w-full h-36 object-cover rounded-xl"
-                crossOrigin="anonymous"
-              />
-            </div>
+            <img
+              src={photo}
+              className="w-full h-36 object-cover rounded"
+              crossOrigin="anonymous"
+            />
           )}
 
-          <div className="flex flex-col items-center gap-2 pt-2">
+          <div className="flex flex-col items-center gap-2">
             <QrCode size={32} />
-            <p className="text-[8px] text-center">
-              Terima Kasih Atas Pembayaran Anda
+            <p className="text-xs text-center">
+              Terima kasih atas pembayaran Anda
             </p>
           </div>
         </div>
 
-        <div className="p-4 bg-gray-50 flex gap-2 print:hidden" data-html2canvas-ignore="true">
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
+        <div className="p-4 flex gap-2 bg-gray-50">
+          <button
             onClick={handleDownload}
             disabled={isGenerating}
-            className="flex-1 bg-indigo-600 text-white py-3 rounded-xl flex items-center justify-center gap-2"
+            className="flex-1 bg-indigo-600 text-white py-2 rounded flex items-center justify-center gap-2"
           >
-            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {isGenerating ? (
+              <Loader2 className="animate-spin" size={14} />
+            ) : (
+              <Download size={14} />
+            )}
             {isGenerating ? 'Memproses...' : 'Download'}
-          </motion.button>
+          </button>
 
-          <motion.button 
-            whileTap={{ scale: 0.95 }}
+          <button
             onClick={onClose}
-            className="w-12 bg-white border rounded-xl flex items-center justify-center"
+            className="w-12 border rounded flex items-center justify-center"
           >
             <X size={18} />
-          </motion.button>
+          </button>
         </div>
       </motion.div>
     </div>
