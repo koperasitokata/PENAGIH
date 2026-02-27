@@ -35,7 +35,7 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
         }));
 
         const canvas = await html2canvas(element, {
-          scale: 3, // Higher scale for better quality
+          scale: 2, // Scale 2 is more stable for mobile memory
           useCORS: true,
           allowTaint: true,
           backgroundColor: '#ffffff',
@@ -43,28 +43,35 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
           onclone: (clonedDoc) => {
             const clonedElement = clonedDoc.getElementById('receipt-card');
             if (clonedElement) {
-              clonedElement.style.borderRadius = '0'; // Ensure sharp corners in image
+              clonedElement.style.transform = 'none';
+              clonedElement.style.borderRadius = '0';
             }
           }
         });
         
-        // Use a more robust download method for Android Chrome
-        const image = canvas.toDataURL("image/jpeg", 1.0);
-        const link = document.createElement('a');
-        link.style.display = 'none';
-        link.href = image;
-        link.download = `STRUK-${nasabah.nama.replace(/\s+/g, '-')}-${Date.now()}.jpg`;
-        document.body.appendChild(link);
-        link.click();
-        
-        // Cleanup
-        setTimeout(() => {
-          document.body.removeChild(link);
-        }, 100);
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.style.display = 'none';
+            link.href = url;
+            link.download = `STRUK-${nasabah.nama.replace(/\s+/g, '-')}-${Date.now()}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            
+            // Cleanup
+            setTimeout(() => {
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+              setIsGenerating(false);
+            }, 200);
+          } else {
+            throw new Error("Blob generation failed");
+          }
+        }, 'image/jpeg', 0.95);
       } catch (err) {
         console.error("Gagal generate struk", err);
-        alert("Gagal menyimpan gambar. Pastikan koneksi internet stabil.");
-      } finally {
+        alert("Gagal menyimpan gambar. Silakan coba lagi atau ambil tangkapan layar (screenshot).");
         setIsGenerating(false);
       }
     } else {
