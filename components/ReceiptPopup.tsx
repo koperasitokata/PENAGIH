@@ -16,10 +16,10 @@ interface ReceiptPopupProps {
 }
 
 const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid, photo, date, onClose }) => {
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
 
-  const handleDownload = async () => {
-    setIsGenerating(true);
+  const handleShare = async () => {
+    setIsSharing(true);
     const element = document.getElementById('receipt-card');
     
     if (element && typeof html2canvas !== 'undefined') {
@@ -70,7 +70,7 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
 
         canvas.toBlob(async (blob) => {
           if (blob) {
-            // Priority 1: Native Share (Best for Mobile Gallery)
+            // Priority 1: Native Share (Best for Mobile Gallery & WhatsApp)
             if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/jpeg' })] })) {
               try {
                 const file = new File([blob], filename, { type: 'image/jpeg' });
@@ -79,14 +79,14 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
                   title: 'Struk Pembayaran',
                   text: `Struk Pembayaran ${nasabah.nama}`
                 });
-                setIsGenerating(false);
+                setIsSharing(false);
                 return;
               } catch (shareErr) {
                 console.log("Share cancelled or failed, falling back to download", shareErr);
               }
             }
 
-            // Priority 2: Standard Download
+            // Priority 2: Standard Download (Fallback for Desktop)
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.style.display = 'none';
@@ -99,7 +99,7 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
             setTimeout(() => {
               document.body.removeChild(link);
               window.URL.revokeObjectURL(url);
-              setIsGenerating(false);
+              setIsSharing(false);
             }, 500);
           } else {
             throw new Error("Blob generation failed");
@@ -107,12 +107,12 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
         }, 'image/jpeg', 0.95);
       } catch (err) {
         console.error("Gagal generate struk", err);
-        alert("Gagal menyimpan gambar. Silakan coba lagi atau ambil tangkapan layar (screenshot).");
-        setIsGenerating(false);
+        alert("Gagal memproses gambar. Silakan coba lagi atau ambil tangkapan layar (screenshot).");
+        setIsSharing(false);
       }
     } else {
       window.print();
-      setIsGenerating(false);
+      setIsSharing(false);
     }
   };
 
@@ -122,7 +122,7 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
   });
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm print:p-0 print:bg-white">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/90 backdrop-blur-md print:p-0 print:bg-white">
       <motion.div 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -206,12 +206,12 @@ const ReceiptPopup: React.FC<ReceiptPopupProps> = ({ record, nasabah, amountPaid
         <div className="p-4 bg-gray-50 flex gap-2 print:hidden border-t border-gray-100" data-html2canvas-ignore="true">
           <motion.button 
             whileTap={{ scale: 0.95 }}
-            onClick={handleDownload}
-            disabled={isGenerating}
+            onClick={handleShare}
+            disabled={isSharing}
             className="flex-1 bg-indigo-600 text-white py-3 rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-indigo-200 transition-all flex items-center justify-center gap-2"
           >
-            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-            {isGenerating ? 'Memproses...' : 'Simpan / Bagikan'}
+            {isSharing ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
+            {isSharing ? 'Memproses...' : 'Bagikan Struk'}
           </motion.button>
           <motion.button 
             whileTap={{ scale: 0.95 }}
