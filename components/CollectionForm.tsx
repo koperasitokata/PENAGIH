@@ -25,6 +25,8 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
   const [formError, setFormError] = useState<string | null>(null);
   const [isCameraStarting, setIsCameraStarting] = useState(true);
   
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const html5QrCodeRef = useRef<any>(null);
   const isMounted = useRef(true);
@@ -73,30 +75,51 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
     }
   };
 
-  // Efek Kamera
-  useEffect(() => {
-    if (!qrVerified) {
+  const startCamera = async () => {
+    if (html5QrCodeRef.current?.isScanning) return;
+    
+    setCameraError(null);
+    setIsCameraStarting(true);
+    
+    // Small delay to ensure DOM is ready
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    try {
       const html5QrCode = new Html5Qrcode("reader-camera");
       html5QrCodeRef.current = html5QrCode;
       
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      const config = { 
+        fps: 10, 
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0
+      };
       
-      html5QrCode.start(
+      await html5QrCode.start(
         { facingMode: "environment" },
         config,
         (decodedText) => {
           handleQrSuccess(decodedText);
         },
         (errorMessage) => {
-          // Terlalu berisik jika di log
+          // Ignore noisy logs
         }
-      ).catch(err => {
-        console.error("Camera start error:", err);
-      });
+      );
+      setIsCameraStarting(false);
+    } catch (err: any) {
+      console.error("Camera start error:", err);
+      setCameraError("Gagal membuka kamera. Pastikan izin kamera diaktifkan.");
+      setIsCameraStarting(false);
+    }
+  };
+
+  // Efek Kamera
+  useEffect(() => {
+    if (!qrVerified) {
+      startCamera();
 
       return () => {
-        if (html5QrCode.isScanning) {
-          html5QrCode.stop().catch(err => console.error("Stop camera error:", err));
+        if (html5QrCodeRef.current?.isScanning) {
+          html5QrCodeRef.current.stop().catch((err: any) => console.error("Stop camera error:", err));
         }
       };
     }
@@ -236,6 +259,19 @@ const CollectionForm: React.FC<CollectionFormProps> = ({ records, nasabahList, p
 
            <div className="w-full aspect-square max-w-[320px] rounded-[3rem] border-4 border-emerald-500/30 bg-black relative overflow-hidden shadow-2xl shadow-emerald-500/10">
              <div id="reader-camera" className="w-full h-full"></div>
+             {cameraError && (
+               <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-black/80 z-30">
+                 <AlertTriangle size={32} className="text-red-500 mb-4" />
+                 <p className="text-white text-xs font-bold mb-4">{cameraError}</p>
+                 <button 
+                   type="button"
+                   onClick={startCamera}
+                   className="px-6 py-2 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest"
+                 >
+                   Coba Lagi
+                 </button>
+               </div>
+             )}
              <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none"></div>
              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 border-2 border-emerald-500 rounded-2xl pointer-events-none">
                <motion.div 
