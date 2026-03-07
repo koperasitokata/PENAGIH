@@ -192,9 +192,10 @@ const CollectionMap: React.FC<CollectionMapProps> = ({ records, submissions, nas
     };
   }, []);
 
-  // Update Collector Marker
+  // Update Collector Marker & Center if needed
   useEffect(() => {
     if (!mapInstanceRef.current || !collectorLayerRef.current || !collectorLoc) return;
+    
     collectorLayerRef.current.clearLayers();
     const icon = L.divIcon({
       className: 'collector-icon',
@@ -203,6 +204,11 @@ const CollectionMap: React.FC<CollectionMapProps> = ({ records, submissions, nas
       iconAnchor: [20, 20]
     });
     L.marker([collectorLoc.latitude, collectorLoc.longitude], { icon, zIndexOffset: 1000 }).addTo(collectorLayerRef.current);
+
+    if (!hasCenteredOnCollectorRef.current) {
+      mapInstanceRef.current.setView([collectorLoc.latitude, collectorLoc.longitude], 17);
+      hasCenteredOnCollectorRef.current = true;
+    }
   }, [collectorLoc]);
 
   // Update Markers
