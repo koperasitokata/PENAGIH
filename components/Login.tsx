@@ -8,9 +8,10 @@ import { APP_CONFIG } from '../src/config';
 
 interface LoginProps {
   onLogin: (profile: PetugasProfile) => void;
+  currentTheme?: string;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, currentTheme = 'default' }) => {
   const [role, setRole] = useState<'KOLEKTOR' | 'ADMIN'>('KOLEKTOR');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -39,10 +40,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   };
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center p-6 bg-slate-950 text-white relative overflow-hidden">
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/20 via-transparent to-emerald-900/20 z-0"></div>
-      <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-500/10 blur-[120px] rounded-full"></div>
-      <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-emerald-500/10 blur-[120px] rounded-full"></div>
+    <div className={`h-screen flex flex-col items-center justify-center p-6 ${currentTheme === 'light' ? 'bg-white text-slate-900' : 'bg-slate-950 text-white'} relative overflow-hidden`}>
+      <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${currentTheme === 'light' ? 'from-emerald-100 via-transparent to-blue-100' : 'from-blue-900/20 via-transparent to-emerald-900/20'} z-0`}></div>
+      <div className={`absolute -top-24 -left-24 w-96 h-96 ${currentTheme === 'light' ? 'bg-emerald-500/10' : 'bg-blue-500/10'} blur-[120px] rounded-full`}></div>
+      <div className={`absolute -bottom-24 -right-24 w-96 h-96 ${currentTheme === 'light' ? 'bg-blue-500/10' : 'bg-emerald-500/10'} blur-[120px] rounded-full`}></div>
 
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
@@ -62,7 +63,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.4em]">TOKATA SECURE ACCESS POINT</p>
+            <p className={`text-[9px] font-black ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/40'} uppercase tracking-[0.4em]`}>TOKATA SECURE ACCESS POINT</p>
           </motion.div>
         </div>
 
@@ -84,14 +85,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
 
           <div className="space-y-4">
             <div className="relative group">
-              <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">ID Petugas / No. HP</label>
+              <label className={`block text-[10px] font-black ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/30'} uppercase tracking-widest mb-2 ml-1`}>ID Petugas / No. HP</label>
               <div className="relative">
-                 <User size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
+                 <User size={18} className={`absolute left-5 top-1/2 -translate-y-1/2 ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/20'} group-focus-within:text-emerald-400 transition-colors`} />
                  <input 
                     type="text" 
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full p-5 pl-14 bg-white/5 border border-white/10 rounded-3xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-white/10" 
+                    className={`w-full p-5 pl-14 ${currentTheme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'} border rounded-3xl text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-300`} 
                     placeholder="Contoh: P01 atau 0812..."
                     required
                  />
@@ -99,14 +100,14 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
 
             <div className="relative group">
-              <label className="block text-[10px] font-black text-white/30 uppercase tracking-widest mb-2 ml-1">Password</label>
+              <label className={`block text-[10px] font-black ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/30'} uppercase tracking-widest mb-2 ml-1`}>Password</label>
               <div className="relative">
-                 <Key size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
+                 <Key size={18} className={`absolute left-5 top-1/2 -translate-y-1/2 ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/20'} group-focus-within:text-emerald-400 transition-colors`} />
                  <input 
                     type="password" 
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full p-5 pl-14 bg-white/5 border border-white/10 rounded-3xl text-sm font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-white/10" 
+                    className={`w-full p-5 pl-14 ${currentTheme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white'} border rounded-3xl text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-300`} 
                     placeholder="••••••••"
                     required
                  />
@@ -134,7 +135,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
         </form>
 
         <div className="text-center">
-           <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.3em] leading-relaxed">
+           <p className={`text-[8px] font-black ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/20'} uppercase tracking-[0.3em] leading-relaxed`}>
              Sistem Penagihan Otomatis & Terpusat<br/>
              Authorized Personnel Only
            </p>
