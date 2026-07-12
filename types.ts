@@ -111,4 +111,4 @@ export enum ViewMode {
   SAVINGS_WITHDRAWAL = 'SAVINGS_WITHDRAWAL'
 }
 
-export type ThemeType = 'default' | 'midnight' | 'sunset';
+export type ThemeType = 'default' | 'midnight' | 'sunset' | 'light';

@@ -15,8 +15,77 @@ import ReceiptPopup from './components/ReceiptPopup';
 import ProfileSettings from './components/ProfileSettings';
 import Login from './components/Login';
 import { ApiService } from './ApiService';
+import { WebhookService } from './WebhookService';
 import { Home, FileSignature, Camera, Users, Map as MapIcon, Loader2, AlertCircle, Activity } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+function parseDateStringToISO(dateStr: any): string {
+  if (!dateStr) return new Date().toISOString();
+  if (dateStr instanceof Date) return dateStr.toISOString();
+  
+  const str = String(dateStr).trim();
+  
+  // 1. Try standard JS parsing
+  let d = new Date(str);
+  if (!isNaN(d.getTime())) return d.toISOString();
+  
+  // 2. Handle DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    
+    // Check for optional time part
+    const timeMatch = str.match(/\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (timeMatch) {
+      const hour = parseInt(timeMatch[1], 10);
+      const min = parseInt(timeMatch[2], 10);
+      const sec = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+      return new Date(year, month, day, hour, min, sec).toISOString();
+    }
+    return new Date(year, month, day).toISOString();
+  }
+  
+  // 3. Handle YYYY-MM-DD
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    return new Date(year, month, day).toISOString();
+  }
+
+  // 4. Handle Indonesian months
+  const monthsId: { [key: string]: number } = {
+    januari: 0, jan: 0,
+    februari: 1, feb: 1,
+    maret: 2, mar: 2,
+    april: 3, apr: 3,
+    mei: 4,
+    juni: 5, jun: 5,
+    juli: 6, jul: 6,
+    agustus: 7, agt: 7, ags: 7,
+    september: 8, sep: 8,
+    oktober: 9, okt: 9,
+    november: 10, nov: 10,
+    desember: 11, des: 11
+  };
+  
+  const lowerStr = str.toLowerCase();
+  for (const [mName, mIdx] of Object.entries(monthsId)) {
+    if (lowerStr.includes(mName)) {
+      const parts = lowerStr.split(/\s+/);
+      const dayPart = parts.find(p => /^\d{1,2}$/.test(p));
+      const yearPart = parts.find(p => /^\d{4}$/.test(p));
+      if (dayPart && yearPart) {
+        return new Date(parseInt(yearPart, 10), mIdx, parseInt(dayPart, 10)).toISOString();
+      }
+    }
+  }
+
+  return str;
+}
 
 const THEMES = {
   default: {
@@ -45,6 +114,15 @@ const THEMES = {
     navIcon: 'text-rose-400',
     button: 'from-amber-500 to-rose-500',
     shadow: 'shadow-rose-500/30'
+  },
+  light: {
+    bg: 'bg-white',
+    gradient: 'from-emerald-100 via-transparent to-blue-100',
+    glow1: 'bg-emerald-500/10',
+    glow2: 'bg-blue-500/10',
+    navIcon: 'text-emerald-600',
+    button: 'from-emerald-500 to-blue-600',
+    shadow: 'shadow-emerald-500/20'
   }
 };
 
@@ -67,7 +145,7 @@ const App: React.FC = () => {
   const [hasNewNotifications, setHasNewNotifications] = useState(false);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<ThemeType>(() => {
-    return (localStorage.getItem('app_theme') as ThemeType) || 'default';
+    return (localStorage.getItem('app_theme') as ThemeType) || 'light';
   });
 
   const activeTheme = THEMES[currentTheme];
@@ -80,24 +158,31 @@ const App: React.FC = () => {
   const [apiError, setApiError] = useState<string | null>(null);
   
   const [petugas, setPetugas] = useState<PetugasProfile>({ id_petugas: '', nama: 'Memuat...', no_hp: '', jabatan: 'KOLEKTOR', foto: '' });
+  const dataSyncedRef = useRef(false);
 
   const prevSubmissionsRef = useRef<PengajuanPinjaman[]>([]);
 
   const loadData = useCallback(async (showFullLoader = true) => {
     const petugasId = petugas.id_petugas || (petugas as any).id;
-    if (!isAuthenticated || !petugasId) return;
+    const userRole = String(petugas.jabatan || 'KOLEKTOR').toUpperCase();
     
-    const userRole = String(petugas.jabatan || '').toUpperCase();
-    
-    if (showFullLoader) setIsLoading(true);
+    // Optimasi: Jika sudah pernah sinkron (dataSyncedRef), jangan tampilkan full loader 
+    // agar transisi setelah login mulus tanpa menunggu loading lagi.
+    const shouldShowFullLoader = showFullLoader && isAuthenticated && !dataSyncedRef.current;
+
+    if (shouldShowFullLoader) setIsLoading(true);
     else setIsRefreshing(true);
+    
     setApiError(null);
     
     try {
       // 1. Ambil data utama via POST (Dashboard logic)
-      const response = await ApiService.getDashboardData(petugas.jabatan, petugasId);
+      let response = { success: false, data: {}, message: '' };
+      if (petugasId) {
+        response = await ApiService.getDashboardData(petugas.jabatan, petugasId);
+      }
       
-      // 2. Ambil data tambahan via GET (doGet logic yang baru dipasang user)
+      // 2. Ambil data tambahan via GET (doGet logic)
       let getResponse = { success: false, data: {} };
       try {
         getResponse = await ApiService.getData();
@@ -105,17 +190,18 @@ const App: React.FC = () => {
         console.warn("Gagal mengambil data via GET:", e);
       }
       
-      if (!response.success && !getResponse.success) {
+      if (!response.success && !getResponse.success && isAuthenticated) {
         throw new Error(response.message || (getResponse as any).message || "Gagal mengambil data dari server");
       }
       
       // Gabungkan data dari kedua sumber
-      const data = { 
-        ...(response.data || {}), 
-        ...(getResponse.data || {}) 
+      const data: any = { 
+        ...(getResponse.data || {}),
+        ...(response.data || {})
       };
       
       setApiError(null);
+      dataSyncedRef.current = true;
       
       // Ambil data pengajuan dari berbagai kemungkinan field
       let allSubmissionsMap = new Map<string, PengajuanPinjaman>();
@@ -437,10 +523,9 @@ const App: React.FC = () => {
       
       // Sort mutations by date descending
       synthesizedMutations.sort((a, b) => {
-        const dateA = new Date(a.tanggal).getTime();
-        const dateB = new Date(b.tanggal).getTime();
-        if (isNaN(dateA) || isNaN(dateB)) return 0;
-        return dateB - dateA;
+        const timeA = new Date(parseDateStringToISO(a.tanggal)).getTime();
+        const timeB = new Date(parseDateStringToISO(b.tanggal)).getTime();
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
       });
       
       setMutations([...synthesizedMutations]);
@@ -511,8 +596,34 @@ const App: React.FC = () => {
       const finalRecords = normalizeRecords(allLoanRecords);
       setRecords(finalRecords);
       
-      setSubmissions(syncedSubmissions);
-      prevSubmissionsRef.current = syncedSubmissions;
+      // Synthesis fallback: Ensure every record in finalRecords also has a corresponding 'Disbursed' submission if not present
+      finalRecords.forEach((rec: any) => {
+        const id = String(rec.id_pinjaman || rec.id || '').trim();
+        const nasId = String(rec.id_nasabah || '').trim();
+        
+        // Find if this loan is already represented in allSubmissionsMap
+        const isAlreadyInMap = Array.from(allSubmissionsMap.values()).some(
+          s => String(s.id_pengajuan) === id || 
+               (String(s.id_nasabah) === nasId && s.status === 'Disbursed')
+        );
+        
+        if (!isAlreadyInMap && id) {
+          allSubmissionsMap.set(`DISB-${id}`, {
+            id_pengajuan: id,
+            id_nasabah: nasId,
+            nama: rec.nama || getDisplayName(nasId, 'Nasabah'),
+            jumlah: rec.pokok || rec.total_hutang || 0,
+            tenor: rec.tenor || 0,
+            status: 'Disbursed',
+            tanggal: rec.tanggal || new Date().toISOString(),
+            submissionType: 'PINJAMAN'
+          } as any);
+        }
+      });
+
+      const finalSyncedSubmissions = Array.from(allSubmissionsMap.values());
+      setSubmissions(finalSyncedSubmissions);
+      prevSubmissionsRef.current = finalSyncedSubmissions;
       
       if (data.nasabah_list) {
         setFullNasabahList(data.nasabah_list);
@@ -558,11 +669,14 @@ const App: React.FC = () => {
   }, [isAuthenticated, petugas.id_petugas, petugas.jabatan]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadData(true);
-      const interval = setInterval(() => loadData(false), 30000);
-      return () => clearInterval(interval);
-    }
+    // Start loading data immediately on mount
+    loadData(isAuthenticated);
+    
+    const interval = setInterval(() => {
+      loadData(false);
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, [loadData, isAuthenticated]);
 
   const handleLogin = (profile: PetugasProfile) => {
@@ -581,11 +695,16 @@ const App: React.FC = () => {
   const handleAddRecord = async (payload: any) => {
     try {
       const res = await ApiService.bayarAngsuran({
+        pakaiSimpanan: false,
+        jumlahSimpananDiterapkan: 0,
         ...payload,
         petugas: petugas.nama
       });
       if (res.success) {
+        // Webhook n8n sekarang dikirim secara otomatis oleh backend server (api-login.php)
         const activeLoan = records.find(r => r.id_pinjaman === payload.id_pinjam);
+        const newSisa = activeLoan ? activeLoan.sisa_hutang - payload.jumlah : 0;
+
         const activeNasabah = nasabahList.find(n => n.id_nasabah === payload.id_nasabah);
         
         if (activeLoan && activeNasabah) {
@@ -629,6 +748,7 @@ const App: React.FC = () => {
         petugas: petugas.nama
       });
       if (res.success) {
+        // Webhook n8n sekarang dikirim secara otomatis oleh backend server (api-login.php)
         loadData(false);
       }
     } catch (e) {
@@ -666,7 +786,7 @@ const App: React.FC = () => {
   };
 
   if (!isAuthenticated) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} currentTheme={currentTheme} />;
   }
 
   if (apiError) {
@@ -696,7 +816,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className={`h-screen flex flex-col max-w-md mx-auto ${activeTheme.bg} text-white shadow-2xl relative border-x border-white/10 overflow-hidden`}>
+    <div className={`h-screen flex flex-col max-w-md mx-auto ${activeTheme.bg} ${currentTheme === 'light' ? 'text-slate-900' : 'text-white'} shadow-2xl relative border-x ${currentTheme === 'light' ? 'border-slate-200' : 'border-white/10'} overflow-hidden`}>
       {/* Background Decorations like Login */}
       <div className={`absolute top-0 left-0 w-full h-full bg-gradient-to-br ${activeTheme.gradient} z-0 pointer-events-none`}></div>
       <div className={`absolute -top-24 -left-24 w-96 h-96 ${activeTheme.glow1} blur-[120px] rounded-full pointer-events-none`}></div>
@@ -713,6 +833,7 @@ const App: React.FC = () => {
         isRefreshing={isRefreshing}
         petugas={petugas}
         accentColor={activeTheme.navIcon}
+        currentTheme={currentTheme}
       />
       
       <main className="flex-1 overflow-y-auto pb-28 relative scroll-smooth z-10">
@@ -737,6 +858,7 @@ const App: React.FC = () => {
                     onSelectTarget={handleGoToForm} 
                     collector={petugas} 
                     accentColor={activeTheme.navIcon}
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
@@ -752,13 +874,14 @@ const App: React.FC = () => {
                       setView(ViewMode.DASHBOARD);
                       setPrefilledName('');
                     }} 
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
               
               {view === ViewMode.HISTORY && (
                 <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <HistoryList records={records} />
+                  <HistoryList records={records} currentTheme={currentTheme} />
                 </motion.div>
               )}
 
@@ -771,6 +894,7 @@ const App: React.FC = () => {
                     petugas={petugas}
                     onAddSubmission={handleAddSubmission} 
                     onCairkan={handleCairkanPinjaman}
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
@@ -781,6 +905,7 @@ const App: React.FC = () => {
                     records={records} 
                     nasabahList={nasabahList}
                     onSelectCustomer={handleSelectNasabah} 
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
@@ -819,6 +944,7 @@ const App: React.FC = () => {
                       return idMatch || idInDesc || nameInDesc || fuzzyNameMatch;
                     })}
                     onBack={() => setView(ViewMode.CUSTOMER_LIST)} 
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
@@ -830,6 +956,7 @@ const App: React.FC = () => {
                     nasabahList={nasabahList}
                     records={records}
                     onBack={() => setView(ViewMode.DASHBOARD)} 
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
@@ -844,6 +971,7 @@ const App: React.FC = () => {
                       setView(ViewMode.DASHBOARD);
                       loadData(false);
                     }}
+                    currentTheme={currentTheme}
                   />
                 </motion.div>
               )}
@@ -852,29 +980,29 @@ const App: React.FC = () => {
         </AnimatePresence>
       </main>
 
-      <nav className="fixed bottom-6 left-4 right-4 max-w-[calc(448px-2rem)] mx-auto bg-slate-900/60 backdrop-blur-3xl border border-white/10 flex justify-around items-center h-18 z-[1001] rounded-[2.5rem] shadow-2xl shadow-black/50">
-        <button onClick={() => setView(ViewMode.DASHBOARD)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.DASHBOARD ? activeTheme.navIcon : 'text-white/40'}`}>
+      <nav className={`fixed bottom-6 left-4 right-4 max-w-[calc(448px-2rem)] mx-auto ${currentTheme === 'light' ? 'bg-white/80 border-slate-200' : 'bg-slate-900/60 border-white/10'} backdrop-blur-3xl border flex justify-around items-center h-18 z-[1001] rounded-[2.5rem] shadow-2xl ${currentTheme === 'light' ? 'shadow-slate-200/50' : 'shadow-black/50'}`}>
+        <button onClick={() => setView(ViewMode.DASHBOARD)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.DASHBOARD ? activeTheme.navIcon : (currentTheme === 'light' ? 'text-slate-400' : 'text-white/40')}`}>
           <Home size={18} />
           <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Home</span>
         </button>
-        <button onClick={() => setView(ViewMode.SUBMISSION)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.SUBMISSION ? activeTheme.navIcon : 'text-white/40'}`}>
+        <button onClick={() => setView(ViewMode.SUBMISSION)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.SUBMISSION ? activeTheme.navIcon : (currentTheme === 'light' ? 'text-slate-400' : 'text-white/40')}`}>
           <FileSignature size={18} />
           <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Ajuan</span>
         </button>
         <button onClick={() => handleGoToForm()} className="flex flex-col items-center justify-center w-full h-full">
           <motion.div 
             whileTap={{ scale: 0.9 }}
-            className={`bg-gradient-to-br ${activeTheme.button} text-white w-14 h-14 rounded-full flex items-center justify-center -mt-12 shadow-xl ${activeTheme.shadow} border-4 border-slate-950`}
+            className={`bg-gradient-to-br ${activeTheme.button} text-white w-14 h-14 rounded-full flex items-center justify-center -mt-12 shadow-xl ${activeTheme.shadow} border-4 ${currentTheme === 'light' ? 'border-slate-50' : 'border-slate-950'}`}
           >
             <Camera size={24} />
           </motion.div>
-          <span className={`text-[8px] mt-1 font-bold uppercase tracking-wider ${view === ViewMode.FORM ? activeTheme.navIcon : 'text-white/40'}`}>Input</span>
+          <span className={`text-[8px] mt-1 font-bold uppercase tracking-wider ${view === ViewMode.FORM ? activeTheme.navIcon : (currentTheme === 'light' ? 'text-slate-400' : 'text-white/40')}`}>Input</span>
         </button>
-        <button onClick={() => setView(ViewMode.CUSTOMER_LIST)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.CUSTOMER_LIST || view === ViewMode.INSTALLMENT_CARD ? activeTheme.navIcon : 'text-white/40'}`}>
+        <button onClick={() => setView(ViewMode.CUSTOMER_LIST)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.CUSTOMER_LIST || view === ViewMode.INSTALLMENT_CARD ? activeTheme.navIcon : (currentTheme === 'light' ? 'text-slate-400' : 'text-white/40')}`}>
           <Users size={18} />
           <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Nasabah</span>
         </button>
-        <button onClick={() => setView(ViewMode.MAP)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.MAP ? activeTheme.navIcon : 'text-white/40'}`}>
+        <button onClick={() => setView(ViewMode.MAP)} className={`flex flex-col items-center justify-center w-full h-full transition-all ${view === ViewMode.MAP ? activeTheme.navIcon : (currentTheme === 'light' ? 'text-slate-400' : 'text-white/40')}`}>
           <MapIcon size={18} />
           <span className="text-[8px] mt-1 font-bold uppercase tracking-wider">Peta</span>
         </button>

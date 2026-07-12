@@ -286,6 +286,7 @@ function bayarAngsuran(payload) {
       activeSheet.getRange(i + 1, sisaCol + 1).setValue(newSisa);
       if (newSisa <= 0) activeSheet.getRange(i + 1, statusCol + 1).setValue("Lunas");
       angsuranSheet.appendRow(["PAY" + new Date().getTime(), new Date(), payload.id_pinjam, payload.id_nasabah, payload.jumlah, newSisa, payload.petugas, payload.fotoBayar]);
+      
       return createResponse({ success: true });
     }
   }
