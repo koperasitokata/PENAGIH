@@ -16,6 +16,7 @@ interface HeaderProps {
   isRefreshing: boolean;
   petugas: PetugasProfile;
   accentColor?: string;
+  currentTheme?: string;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -28,7 +29,8 @@ const Header: React.FC<HeaderProps> = ({
   onRefresh, 
   isRefreshing, 
   petugas,
-  accentColor = 'text-emerald-400'
+  accentColor = 'text-emerald-400',
+  currentTheme = 'default'
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   
@@ -51,13 +53,13 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="text-white p-4 sticky top-0 z-[1100]">
+    <header className={`${currentTheme === 'light' ? 'text-slate-900 border-b border-slate-100 bg-white/50 backdrop-blur-md' : 'text-white'} p-4 sticky top-0 z-[1100]`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src={APP_CONFIG.LOGO_URL} alt="Logo" className={`${APP_CONFIG.LOGO_SIZE_HEADER} object-contain`} />
           <div>
             <h1 className="font-black text-xl leading-none tracking-tight">{APP_CONFIG.APP_NAME}</h1>
-            <p className="text-[8px] text-white/50 uppercase tracking-[0.2em] font-black mt-1">{APP_CONFIG.APP_TAGLINE}</p>
+            <p className={`text-[8px] ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/50'} uppercase tracking-[0.2em] font-black mt-1`}>{APP_CONFIG.APP_TAGLINE}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 relative">
@@ -65,20 +67,20 @@ const Header: React.FC<HeaderProps> = ({
             whileTap={{ scale: 0.9 }}
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors"
+            className={`w-9 h-9 rounded-xl ${currentTheme === 'light' ? 'bg-slate-200 text-slate-600' : 'bg-white/5 text-white/60'} flex items-center justify-center border border-transparent hover:bg-white/10 transition-colors`}
             title="Muat Ulang Data"
           >
-            <RefreshCw size={16} className={`text-white/60 ${isRefreshing ? `animate-spin ${accentColor}` : ''}`} />
+            <RefreshCw size={16} className={`${isRefreshing ? `animate-spin ${accentColor}` : ''}`} />
           </motion.button>
 
           <motion.button 
             whileTap={{ scale: 0.9 }}
             onClick={handleToggleNotifications}
-            className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 hover:bg-white/10 transition-colors relative"
+            className={`w-9 h-9 rounded-xl ${currentTheme === 'light' ? 'bg-slate-200 text-slate-600' : 'bg-white/5 text-white/60'} flex items-center justify-center border border-transparent hover:bg-white/10 transition-colors relative`}
           >
-            <Bell size={16} className="text-white/60" />
+            <Bell size={16} />
             {hasNewNotifications && (
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900 animate-pulse"></span>
+              <span className={`absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 ${currentTheme === 'light' ? 'border-white' : 'border-slate-900'} animate-pulse`}></span>
             )}
           </motion.button>
           
@@ -88,19 +90,19 @@ const Header: React.FC<HeaderProps> = ({
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute top-12 right-0 w-64 bg-slate-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[1200]"
+                className={`absolute top-12 right-0 w-64 ${currentTheme === 'light' ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/10'} border rounded-2xl shadow-2xl overflow-hidden z-[1200]`}
               >
-                <div className="p-3 bg-white/5 border-b border-white/5 flex justify-between items-center">
+                <div className={`p-3 ${currentTheme === 'light' ? 'bg-slate-50 border-slate-100' : 'bg-white/5 border-white/5'} border-b flex justify-between items-center`}>
                   <span className={`text-[9px] font-black uppercase tracking-widest ${accentColor}`}>Pesan Admin Pusat</span>
-                  <button onClick={() => setShowNotifications(false)} className="text-[10px] text-white/20 hover:text-white">
+                  <button onClick={() => setShowNotifications(false)} className={`text-[10px] ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/20'} hover:text-white`}>
                     <X size={12} />
                   </button>
                 </div>
                 <div className="max-h-60 overflow-y-auto">
                   {activeNotifications.map(notif => (
-                    <div key={notif.id} className="p-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer">
-                      <p className="text-[10px] font-medium text-white/80 leading-relaxed mb-1">{notif.text}</p>
-                      <p className="text-[8px] font-bold text-white/20 uppercase">{notif.time}</p>
+                    <div key={notif.id} className={`p-3 border-b ${currentTheme === 'light' ? 'border-slate-50 hover:bg-slate-50' : 'border-white/5 hover:bg-white/5'} transition-colors cursor-pointer`}>
+                      <p className={`text-[10px] font-medium ${currentTheme === 'light' ? 'text-slate-700' : 'text-white/80'} leading-relaxed mb-1`}>{notif.text}</p>
+                      <p className={`text-[8px] font-bold ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/20'} uppercase`}>{notif.time}</p>
                     </div>
                   ))}
                 </div>
@@ -111,7 +113,7 @@ const Header: React.FC<HeaderProps> = ({
           <motion.button 
             whileTap={{ scale: 0.9 }}
             onClick={onProfileClick}
-            className={`w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 overflow-hidden`}
+            className={`w-9 h-9 rounded-xl ${currentTheme === 'light' ? 'bg-slate-200 border-slate-300' : 'bg-white/5 border-white/10'} flex items-center justify-center border overflow-hidden`}
           >
             {petugas.foto ? (
               <img src={petugas.foto} alt="Profile" className="w-full h-full object-cover" />

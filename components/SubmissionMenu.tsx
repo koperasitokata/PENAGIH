@@ -11,6 +11,7 @@ interface SubmissionMenuProps {
   petugas: PetugasProfile;
   onAddSubmission: (payload: any) => void;
   onCairkan: (payload: any) => void;
+  currentTheme?: string;
 }
 
 const SubmissionMenu: React.FC<SubmissionMenuProps> = ({ 
@@ -19,8 +20,28 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
   records = [],
   petugas,
   onAddSubmission, 
-  onCairkan 
+  onCairkan,
+  currentTheme = 'default'
 }) => {
+  // Sort submissions: 'Approved' (yang butuh dicairkan) is at the very top, followed by 'Pending' (menunggu ACC), followed by 'Disbursed' / 'Cair' (sudah cair)
+  const sortedSubmissions = [...submissions].sort((a, b) => {
+    const getPriority = (status: string) => {
+      const s = String(status || '').toLowerCase();
+      if (s === 'approved') return 1; // "yang butuh di cairkan" -> paling di sebelah atas list
+      if (s === 'pending') return 2;
+      if (s === 'disbursed' || s === 'cair') return 3;
+      return 4;
+    };
+    
+    const pA = getPriority(a.status);
+    const pB = getPriority(b.status);
+    
+    if (pA !== pB) return pA - pB;
+    
+    // Fallback: sort newest first (using id_pengajuan or index)
+    return String(b.id_pengajuan || '').localeCompare(String(a.id_pengajuan || ''));
+  });
+
   const [view, setView] = useState<'LIST' | 'FORM' | 'SELECTOR'>('LIST');
   const [isLoadingNasabah, setIsLoadingNasabah] = useState(false);
   const [selectedNasabah, setSelectedNasabah] = useState<Nasabah | null>(null);
@@ -42,6 +63,11 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
   const [potongSimpanan, setPotongSimpanan] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const textPrimary = currentTheme === 'light' ? 'text-slate-800' : 'text-white';
+  const textMuted = currentTheme === 'light' ? 'text-slate-400' : 'text-white/40';
+  const cardBg = currentTheme === 'light' ? 'bg-white border-slate-100 shadow-sm' : 'bg-white/5 border-white/10';
+  const inputBg = currentTheme === 'light' ? 'bg-white border-slate-200 text-slate-900' : 'bg-white/5 border-white/10 text-white';
 
   const handleOpenSelector = () => {
     setIsLoadingNasabah(true);
@@ -91,6 +117,22 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
       fee: adminFee,
       net: netCash
     });
+
+    // Start background pre-fetching of GPS location to save time and prevent timeout
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setTempLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude
+          });
+        },
+        (err) => {
+          console.warn("Pre-fetch GPS locator failed:", err);
+        },
+        { enableHighAccuracy: true, timeout: 15000 }
+      );
+    }
   };
 
   const proceedDisbursement = () => {
@@ -101,7 +143,14 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
     
     setDisbursementTarget(targetSub);
     setIsGettingLoc(true);
+
+    // 1. Immediately trigger the camera file-click synchronously in the main thread handler.
+    // This is required to bypass iOS Safari's strict security blockade on programmatic triggers.
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
     
+    // 2. Refresh geographic location in parallel (non-blocking)
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -110,19 +159,16 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
             longitude: pos.coords.longitude
           });
           setIsGettingLoc(false);
-          setTimeout(() => fileInputRef.current?.click(), 100);
         },
         (err) => {
-          console.error(err);
+          console.warn("Background GPS capture failed:", err);
           setIsGettingLoc(false);
-          alert("Gagal mengambil lokasi GPS. Pastikan GPS aktif.");
-          setTimeout(() => fileInputRef.current?.click(), 100);
+          // We intentionally avoid alerts or blocks here to keep the user flow functional in low signal areas/iframes
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 15000 }
       );
     } else {
       setIsGettingLoc(false);
-      fileInputRef.current?.click();
     }
   };
 
@@ -148,7 +194,7 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
           const payload = {
             id_pengajuan: disbursementTarget.id_pengajuan,
             petugas: petugas.nama,
-            fotoCair: compressedDataUrl,
+            fotoBukti: compressedDataUrl,
             potongSimpanan: potongSimpanan
           };
           
@@ -177,7 +223,7 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
         <>
           <div className="flex items-center justify-between px-1">
             <div>
-              <h2 className="text-2xl font-black text-white tracking-tight">Pengajuan</h2>
+              <h2 className={`text-2xl font-black ${textPrimary} tracking-tight`}>Pengajuan</h2>
               <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-[0.2em]">Klarifikasi Lapangan</p>
             </div>
             <motion.button 
@@ -190,28 +236,28 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
           </div>
 
           <div className="space-y-2">
-            <h3 className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em] px-1 mb-4">Daftar Status Pengajuan</h3>
-            {submissions.length === 0 ? (
-              <div className="text-center py-12 bg-white/5 rounded-[2rem] border-2 border-dashed border-white/10">
-                <p className="text-xs text-white/20 font-bold uppercase tracking-widest">Belum ada pengajuan</p>
+            <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] px-1 mb-4 ${textMuted}`}>Daftar Status Pengajuan</h3>
+            {sortedSubmissions.length === 0 ? (
+              <div className={`text-center py-12 ${currentTheme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'} rounded-[2rem] border-2 border-dashed`}>
+                <p className={`text-xs ${textMuted} font-bold uppercase tracking-widest`}>Belum ada pengajuan</p>
               </div>
             ) : (
-              submissions.map((sub, idx) => (
+              sortedSubmissions.map((sub, idx) => (
                 <motion.div 
                   key={sub.id_pengajuan} 
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="bg-white/5 backdrop-blur-md p-3 px-4 rounded-2xl border border-white/10 flex items-center justify-between gap-4 transition-all hover:bg-white/10"
+                  className={`${cardBg} backdrop-blur-md p-3 px-4 rounded-2xl border flex items-center justify-between gap-4 transition-all hover:bg-emerald-500/5`}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                       <h4 className="font-black text-xs text-white truncate">{sub.nama}</h4>
+                       <h4 className={`font-black text-xs ${textPrimary} truncate`}>{sub.nama}</h4>
                        <span className={`text-[6px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${
-                        sub.status === 'Pending' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/20' :
-                        sub.status === 'Approved' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20' :
-                        sub.status === 'Disbursed' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/20' :
-                        'bg-white/10 text-white/40 border border-white/10'
+                        sub.status === 'Pending' ? 'bg-yellow-500 text-white shadow-sm shadow-yellow-500/20' :
+                        sub.status === 'Approved' ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20' :
+                        sub.status === 'Disbursed' ? 'bg-blue-500 text-white shadow-sm shadow-blue-500/20' :
+                        'bg-slate-200 text-slate-500'
                       }`}>
                         {sub.status === 'Pending' ? 'Menunggu ACC Admin' : 
                          sub.status === 'Approved' ? 'Siap Dicairkan' : 
@@ -219,11 +265,11 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-3">
-                       <p className="text-[8px] font-black text-white/30 uppercase tracking-tighter">Rp {formatCurrency(sub.jumlah)}</p>
+                       <p className={`text-[8px] font-black ${textMuted} uppercase tracking-tighter`}>Rp {formatCurrency(sub.jumlah)}</p>
                        {(sub as any).submissionType === 'SIMPANAN' ? (
-                         <p className="text-[8px] font-black text-blue-400 uppercase tracking-tighter">Pencairan Simpanan</p>
+                         <p className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">Pencairan Simpanan</p>
                        ) : (
-                         <p className="text-[8px] font-black text-white/30 uppercase tracking-tighter">{sub.tenor} Hari</p>
+                         <p className={`text-[8px] font-black ${textMuted} uppercase tracking-tighter`}>{sub.tenor} Hari</p>
                        )}
                     </div>
                   </div>
@@ -244,13 +290,13 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
                         )}
                         {isGettingLoc && disbursementTarget?.id_pengajuan === sub.id_pengajuan ? 'GPS...' : 'Cairkan'}
                       </motion.button>
-                    ) : sub.status === 'Cair' ? (
-                      <div className="w-8 h-8 rounded-full border border-white/5 flex items-center justify-center opacity-20">
-                        <CheckCircle size={14} className="text-emerald-400" />
+                    ) : sub.status === 'Cair' || sub.status === 'Disbursed' ? (
+                      <div className={`w-8 h-8 rounded-full border ${currentTheme === 'light' ? 'border-emerald-100 bg-emerald-50' : 'border-white/5'} flex items-center justify-center opacity-60`}>
+                        <CheckCircle size={14} className="text-emerald-500" />
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-full border border-white/5 flex items-center justify-center opacity-20">
-                        <Clock size={14} />
+                      <div className={`w-8 h-8 rounded-full border ${currentTheme === 'light' ? 'border-slate-100 bg-slate-50' : 'border-white/5'} flex items-center justify-center opacity-40`}>
+                        <Clock size={14} className={currentTheme === 'light' ? 'text-slate-400' : 'text-white/40'} />
                       </div>
                     )}
                   </div>
@@ -268,43 +314,43 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
           className="space-y-6"
         >
           <div className="flex items-center gap-4 px-1">
-            <button onClick={() => setView('LIST')} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
+            <button onClick={() => setView('LIST')} className={`w-10 h-10 rounded-xl ${currentTheme === 'light' ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/40'} flex items-center justify-center`}>
               <ChevronRight size={20} className="rotate-180" />
             </button>
             <div>
-              <h2 className="text-xl font-black text-white tracking-tight leading-none">Form Pengajuan</h2>
+              <h2 className={`text-xl font-black ${textPrimary} tracking-tight leading-none`}>Form Pengajuan</h2>
               <p className="text-[8px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Input Data Pinjaman</p>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2rem] shadow-2xl space-y-5">
+          <form onSubmit={handleSubmit} className={`${cardBg} backdrop-blur-xl border p-6 rounded-[2rem] shadow-xl space-y-5`}>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-black text-white/60 uppercase tracking-widest">Data Nasabah</h3>
-              <span className="text-[8px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-bold">WAJIB ISI</span>
+              <h3 className={`text-xs font-black ${currentTheme === 'light' ? 'text-slate-500' : 'text-white/60'} uppercase tracking-widest`}>Data Nasabah</h3>
+              <span className="text-[8px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-tighter">WAJIB ISI</span>
             </div>
             
             <div className="relative">
-              <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-1.5 ml-1">Pilih Nasabah</label>
+              <label className={`block text-[9px] font-black ${textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Pilih Nasabah</label>
               <button 
                 type="button"
                 onClick={handleOpenSelector}
-                className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-sm font-bold text-white flex justify-between items-center hover:bg-white/10 transition-all text-left"
+                className={`w-full p-4 ${inputBg} rounded-2xl text-sm font-bold flex justify-between items-center hover:bg-emerald-500/5 transition-all text-left border`}
               >
-                <span className={selectedNasabah ? 'text-white' : 'text-white/30'}>
+                <span className={selectedNasabah ? textPrimary : textMuted}>
                   {selectedNasabah?.nama || "Cari nasabah..."}
                 </span>
-                <Search size={14} className="text-white/20" />
+                <Search size={14} className={textMuted} />
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-1.5 ml-1">Nominal (Rp)</label>
-                <input type="text" value={formatCurrency(requestAmount)} onChange={(e) => setRequestAmount(e.target.value)} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-black text-white" placeholder="0" required />
+                <label className={`block text-[9px] font-black ${textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Nominal (Rp)</label>
+                <input type="text" value={formatCurrency(requestAmount)} onChange={(e) => setRequestAmount(e.target.value)} className={`w-full p-4 ${inputBg} border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-black`} placeholder="0" required />
               </div>
               <div>
-                <label className="block text-[9px] font-black text-white/40 uppercase tracking-widest mb-1.5 ml-1">Tenor (Hari)</label>
-                <input type="number" value={tenor} onChange={(e) => setTenor(e.target.value)} className="w-full p-4 bg-white/5 border border-white/10 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-black text-white" placeholder="10" required />
+                <label className={`block text-[9px] font-black ${textMuted} uppercase tracking-widest mb-1.5 ml-1`}>Tenor (Hari)</label>
+                <input type="number" value={tenor} onChange={(e) => setTenor(e.target.value)} className={`w-full p-4 ${inputBg} border rounded-2xl text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-black`} placeholder="10" required />
               </div>
             </div>
             
@@ -312,7 +358,7 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
               whileTap={{ scale: 0.98 }}
               type="submit" 
               disabled={!selectedNasabah} 
-              className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all ${!selectedNasabah ? 'bg-white/5 text-white/20' : 'bg-emerald-500 text-white shadow-emerald-500/20'}`}
+              className={`w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg transition-all ${!selectedNasabah ? 'bg-slate-200 text-slate-400' : 'bg-emerald-500 text-white shadow-emerald-500/20'}`}
             >
               Ajukan Pinjaman
             </motion.button>
@@ -328,24 +374,24 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
         >
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-4">
-              <button onClick={() => setView('FORM')} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/40">
+              <button onClick={() => setView('FORM')} className={`w-10 h-10 rounded-xl ${currentTheme === 'light' ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/40'} flex items-center justify-center`}>
                 <ChevronRight size={20} className="rotate-180" />
               </button>
               <div>
-                <h2 className="text-xl font-black text-white tracking-tight leading-none">Pilih Nasabah</h2>
+                <h2 className={`text-xl font-black ${textPrimary} tracking-tight leading-none`}>Pilih Nasabah</h2>
                 <p className="text-[8px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Database Pusat</p>
               </div>
             </div>
           </div>
 
           <div className="relative px-1">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-white/20" size={16} />
+            <Search className={`absolute left-5 top-1/2 -translate-y-1/2 ${textMuted}`} size={16} />
             <input 
               type="text" 
               placeholder="Cari Nama atau ID..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500"
+              className={`w-full pl-12 pr-4 py-4 ${inputBg} border rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-300`}
             />
           </div>
 
@@ -353,7 +399,7 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
             {isLoadingNasabah ? (
               <div className="py-20 flex flex-col items-center gap-4">
                 <Loader2 size={32} className="text-emerald-500 animate-spin" />
-                <p className="text-[8px] font-black text-white/30 uppercase tracking-[0.3em]">Sinkronisasi Database...</p>
+                <p className={`text-[8px] font-black ${textMuted} uppercase tracking-[0.3em]`}>Sinkronisasi Database...</p>
               </div>
             ) : (
               nasabahList
@@ -371,30 +417,30 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
                         setSelectedNasabah(n);
                         setView('FORM');
                       }}
-                      className={`w-full p-4 text-left rounded-2xl flex items-center gap-4 transition-all ${
+                      className={`w-full p-4 text-left rounded-2xl flex items-center gap-4 transition-all border ${
                         hasActiveLoan 
-                          ? 'bg-red-500/5 border border-red-500/10 opacity-50 cursor-not-allowed' 
+                          ? 'bg-red-500/5 border-red-500/10 opacity-50 cursor-not-allowed' 
                           : selectedNasabah?.id_nasabah === n.id_nasabah 
-                            ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 scale-[1.02]' 
-                            : 'bg-white/5 text-white/60 hover:bg-white/10 border border-white/5'
+                            ? 'bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 scale-[1.02] border-emerald-400' 
+                            : `${currentTheme === 'light' ? 'bg-white border-slate-100 hover:border-emerald-200' : 'bg-white/5 border-white/5'} ${textPrimary}`
                       }`}
                     >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${
                         hasActiveLoan
-                          ? 'bg-red-500/20 text-red-400'
+                          ? 'bg-red-500/20 text-red-500'
                           : selectedNasabah?.id_nasabah === n.id_nasabah 
                             ? 'bg-white/20' 
-                            : 'bg-emerald-500/10 text-emerald-400'
+                            : (currentTheme === 'light' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-emerald-500/10 text-emerald-400')
                       }`}>
                         {hasActiveLoan ? <Lock size={14} /> : n.nama.charAt(0)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className={`font-black text-xs ${selectedNasabah?.id_nasabah === n.id_nasabah && !hasActiveLoan ? 'text-white' : 'text-white'}`}>{n.nama}</p>
-                        <p className={`text-[8px] font-bold ${selectedNasabah?.id_nasabah === n.id_nasabah && !hasActiveLoan ? 'text-white/60' : 'text-white/20'}`}>
+                        <p className={`font-black text-xs truncate`}>{n.nama}</p>
+                        <p className={`text-[8px] font-bold ${selectedNasabah?.id_nasabah === n.id_nasabah && !hasActiveLoan ? 'text-white/60' : textMuted}`}>
                           {hasActiveLoan ? 'PINJAMAN MASIH AKTIF' : `ID: ${n.id_nasabah}`}
                         </p>
                       </div>
-                      {!hasActiveLoan && <ChevronRight size={12} className="opacity-20" />}
+                      {!hasActiveLoan && <ChevronRight size={12} className={textMuted} />}
                     </motion.button>
                   );
                 })
@@ -418,14 +464,15 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[5000] bg-black/90 backdrop-blur-md flex items-center justify-center p-6"
+            className="fixed inset-0 z-[5000] bg-black/90 backdrop-blur-md overflow-y-auto"
           >
-             <motion.div 
-               initial={{ scale: 0.9, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               exit={{ scale: 0.9, opacity: 0 }}
-               className="w-full max-w-sm bg-white rounded-[2.5rem] overflow-hidden shadow-2xl relative"
-             >
+             <div className="min-h-full flex items-start sm:items-center justify-center sm:p-4">
+                <motion.div 
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="w-full min-h-screen sm:min-h-0 sm:max-w-sm bg-white rounded-none sm:rounded-[2.5rem] overflow-hidden shadow-2xl relative flex flex-col"
+                >
                 <div className="bg-emerald-500 p-6 pt-8 pb-10 text-center relative overflow-hidden">
                    <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
                    <Banknote size={48} className="text-white mx-auto mb-2 relative z-10" />
@@ -490,6 +537,7 @@ const SubmissionMenu: React.FC<SubmissionMenuProps> = ({
                    </div>
                 </div>
              </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

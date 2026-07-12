@@ -10,23 +10,104 @@ interface MutationListProps {
   nasabahList: Nasabah[];
   records: PinjamanAktif[];
   onBack: () => void;
+  currentTheme?: string;
 }
 
-const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList = [], records = [], onBack }) => {
+const safeGetTime = (dateStr: any): number => {
+  if (!dateStr) return 0;
+  if (dateStr instanceof Date) return dateStr.getTime();
+  
+  const str = String(dateStr).trim();
+  
+  // 1. Try standard parser
+  let d = new Date(str);
+  if (!isNaN(d.getTime())) return d.getTime();
+  
+  // 2. Handle DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1; // 0-indexed
+    const year = parseInt(dmyMatch[3], 10);
+    
+    // Let's check for optional time part: e.g. DD/MM/YYYY HH:MM:SS
+    const timeMatch = str.match(/\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+    if (timeMatch) {
+      const hour = parseInt(timeMatch[1], 10);
+      const min = parseInt(timeMatch[2], 10);
+      const sec = timeMatch[3] ? parseInt(timeMatch[3], 10) : 0;
+      return new Date(year, month, day, hour, min, sec).getTime();
+    }
+    return new Date(year, month, day).getTime();
+  }
+  
+  // 3. Handle YYYY-MM-DD
+  const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10) - 1;
+    const day = parseInt(ymdMatch[3], 10);
+    return new Date(year, month, day).getTime();
+  }
+
+  // 4. Handle Indonesian months: e.g. "10 Juli 2026"
+  const monthsId: { [key: string]: number } = {
+    januari: 0, jan: 0,
+    februari: 1, feb: 1,
+    maret: 2, mar: 2,
+    april: 3, apr: 3,
+    mei: 4,
+    juni: 5, jun: 5,
+    juli: 6, jul: 6,
+    agustus: 7, agt: 7, ags: 7,
+    september: 8, sep: 8,
+    oktober: 9, okt: 9,
+    november: 10, nov: 10,
+    desember: 11, des: 11
+  };
+  
+  const lowerStr = str.toLowerCase();
+  for (const [mName, mIdx] of Object.entries(monthsId)) {
+    if (lowerStr.includes(mName)) {
+      const parts = lowerStr.split(/\s+/);
+      const dayPart = parts.find(p => /^\d{1,2}$/.test(p));
+      const yearPart = parts.find(p => /^\d{4}$/.test(p));
+      if (dayPart && yearPart) {
+        return new Date(parseInt(yearPart, 10), mIdx, parseInt(dayPart, 10)).getTime();
+      }
+    }
+  }
+
+  return 0;
+};
+
+const MutationList: React.FC<MutationListProps> = ({ 
+  mutations = [], 
+  nasabahList = [], 
+  records = [], 
+  onBack,
+  currentTheme = 'default'
+}) => {
   const [selectedReceipt, setSelectedReceipt] = useState<{ 
     mutation: Mutation, 
     nasabah: Nasabah, 
     record: PinjamanAktif 
   } | null>(null);
 
+  const textPrimary = currentTheme === 'light' ? 'text-slate-800' : 'text-white';
+  const textMuted = currentTheme === 'light' ? 'text-slate-400' : 'text-white/40';
+
   const sortedMutations = Array.isArray(mutations) ? [...mutations].sort((a, b) => {
-    return new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime();
+    const timeA = safeGetTime(a.tanggal);
+    const timeB = safeGetTime(b.tanggal);
+    return timeB - timeA;
   }) : [];
 
   const getGroupLabel = (dateStr: string | Date) => {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return String(dateStr).toUpperCase();
+    const time = safeGetTime(dateStr);
+    if (time === 0) return String(dateStr).toUpperCase();
     
+    const d = new Date(time);
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
@@ -49,7 +130,9 @@ const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList
   });
 
   const formatTime = (dateStr: string | Date) => {
-    return new Date(dateStr).toLocaleTimeString('id-ID', {
+    const time = safeGetTime(dateStr);
+    const d = time === 0 ? new Date() : new Date(time);
+    return d.toLocaleTimeString('id-ID', {
       hour: '2-digit',
       minute: '2-digit'
     });
@@ -64,12 +147,12 @@ const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList
     >
       <div className="flex items-center justify-between mb-6 px-1">
         <div>
-          <h2 className="text-xl font-black text-white tracking-tight">Mutasi Transaksi</h2>
+          <h2 className={`text-xl font-black ${textPrimary} tracking-tight`}>Mutasi Transaksi</h2>
           <p className="text-[8px] text-purple-400 font-bold uppercase tracking-[0.2em]">Data Aktivitas Keuangan</p>
         </div>
         <button 
           onClick={onBack}
-          className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-xl text-[8px] font-black uppercase tracking-widest text-white/60"
+          className={`px-3 py-1.5 ${currentTheme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-white/5 border-white/10 text-white/60'} rounded-xl text-[8px] font-black uppercase tracking-widest border`}
         >
           Kembali
         </button>
@@ -78,15 +161,15 @@ const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList
       <div className="space-y-6 pb-10">
         {Object.keys(groupedMutations).length === 0 ? (
           <div className="text-center py-20 opacity-20">
-            <Activity size={48} className="mx-auto mb-4" />
-            <p className="text-xs font-black uppercase tracking-widest">Belum ada data mutasi</p>
+            <Activity size={48} className={`mx-auto mb-4 ${textPrimary}`} />
+            <p className={`text-xs font-black uppercase tracking-widest ${textPrimary}`}>Belum ada data mutasi</p>
           </div>
         ) : (
           Object.entries(groupedMutations).map(([label, items], gIdx) => (
             <div key={label} className="space-y-2">
               <div className="flex items-center gap-3 px-1">
-                <span className="text-[7px] font-black text-white/30 uppercase tracking-[0.3em] whitespace-nowrap">{label}</span>
-                <div className="h-[1px] w-full bg-white/5"></div>
+                <span className={`text-[7px] font-black ${textMuted} uppercase tracking-[0.3em] whitespace-nowrap`}>{label}</span>
+                <div className={`h-[1px] w-full ${currentTheme === 'light' ? 'bg-slate-100' : 'bg-white/5'}`}></div>
               </div>
               
               <div className="space-y-1.5">
@@ -96,28 +179,35 @@ const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList
                   
                   // Logic to determine if it's income or expense
                   const isIncome = 
-                    keterangan.includes('bayar') || 
-                    keterangan.includes('setor') || 
-                    keterangan.includes('modal') || 
-                    keterangan.includes('pemasukan') ||
                     jenis === 'simpanan' ||
                     jenis === 'pemasukan' ||
-                    jenis === 'angsuran';
+                    jenis === 'angsuran' ||
+                    jenis === 'modal' ||
+                    (!jenis && (
+                      keterangan.includes('setor') ||
+                      keterangan.includes('bayar') ||
+                      keterangan.includes('angsuran') ||
+                      keterangan.includes('pemasukan') ||
+                      keterangan.includes('modal')
+                    ));
 
                   const isExpense = 
-                    keterangan.includes('tarik') || 
-                    keterangan.includes('cair') || 
-                    keterangan.includes('pengeluaran') || 
-                    keterangan.includes('transport') ||
                     jenis === 'pengeluaran' ||
                     jenis === 'penarikan' ||
-                    jenis === 'pencairan';
+                    jenis === 'pencairan' ||
+                    jenis === 'transport' ||
+                    (!jenis && (
+                      keterangan.includes('tarik') ||
+                      keterangan.includes('cair') ||
+                      keterangan.includes('pengeluaran') ||
+                      keterangan.includes('transport')
+                    ));
                   
-                  const isTransport = jenis === 'transport' || keterangan.includes('transport');
-                  const isPencairan = jenis === 'pencairan' || keterangan.includes('pencairan');
-                  const isSimpanan = jenis === 'simpanan' || keterangan.includes('setor simpanan');
-                  const isPenarikan = jenis === 'penarikan' || keterangan.includes('tarik simpanan') || keterangan.includes('cair simpanan');
-                  const isAngsuran = jenis === 'angsuran' || keterangan.includes('angsuran') || keterangan.includes('bayar');
+                  const isTransport = jenis === 'transport' || (!jenis && keterangan.includes('transport'));
+                  const isPencairan = jenis === 'pencairan' || (!jenis && keterangan.includes('pencairan'));
+                  const isSimpanan = jenis === 'simpanan' || (!jenis && keterangan.includes('setor simpanan'));
+                  const isPenarikan = jenis === 'penarikan' || (!jenis && (keterangan.includes('tarik simpanan') || keterangan.includes('cair simpanan')));
+                  const isAngsuran = jenis === 'angsuran' || (!jenis && (keterangan.includes('angsuran') || keterangan.includes('bayar')));
                   
                   return (
                     <motion.div 
@@ -169,39 +259,49 @@ const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList
                         }
                       }}
                       className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 shadow-sm cursor-pointer ${
-                        isIncome 
-                          ? 'bg-emerald-500/[0.03] border-emerald-500/10' 
-                          : isExpense
-                            ? isTransport 
-                              ? 'bg-blue-500/[0.03] border-blue-500/10'
-                              : isPenarikan
-                                ? 'bg-orange-500/[0.03] border-orange-500/10'
-                                : 'bg-red-500/[0.03] border-red-500/10'
-                            : 'bg-white/5 border-white/10'
+                        currentTheme === 'light'
+                          ? (isIncome 
+                              ? 'bg-emerald-50/50 border-emerald-100' 
+                              : isExpense
+                                ? isTransport 
+                                  ? 'bg-blue-50/50 border-blue-100'
+                                  : isPenarikan
+                                    ? 'bg-orange-50/50 border-orange-100'
+                                    : 'bg-red-50/50 border-red-100'
+                                : 'bg-white border-slate-100')
+                          : (isIncome 
+                              ? 'bg-emerald-500/[0.03] border-emerald-500/10' 
+                              : isExpense
+                                ? isTransport 
+                                  ? 'bg-blue-500/[0.03] border-blue-500/10'
+                                  : isPenarikan
+                                    ? 'bg-orange-500/[0.03] border-orange-500/10'
+                                    : 'bg-red-500/[0.03] border-red-500/10'
+                                : 'bg-white/5 border-white/10')
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center border flex-shrink-0 ${
                           isIncome 
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
                             : isExpense
                               ? isTransport
-                                ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                                ? 'bg-blue-500/10 border-blue-500/20 text-blue-600'
                                 : isPenarikan
-                                  ? 'bg-orange-500/10 border-orange-500/20 text-orange-400'
-                                  : 'bg-red-500/10 border-red-500/20 text-red-400'
+                                  ? 'bg-orange-500/10 border-orange-500/20 text-orange-600'
+                                  : 'bg-red-500/10 border-red-500/20 text-red-600'
                               : 'bg-white/10 border-white/20 text-white/40'
                         }`}>
                           {isIncome ? <ArrowDownLeft size={14} /> : <ArrowUpRight size={14} />}
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <h4 className="text-[9px] font-black text-white leading-tight truncate">{m.keterangan}</h4>
+                            <h4 className={`text-[9px] font-black ${textPrimary} leading-tight truncate`}>{m.keterangan}</h4>
                             {isTransport && <span className="text-[6px] font-black bg-blue-500 text-white px-1 rounded-sm uppercase tracking-tighter">TRANS</span>}
                             {isPencairan && <span className="text-[6px] font-black bg-orange-500 text-white px-1 rounded-sm uppercase tracking-tighter">CAIR</span>}
                             {isPenarikan && <span className="text-[6px] font-black bg-orange-600 text-white px-1 rounded-sm uppercase tracking-tighter">WD</span>}
                           </div>
-                          <div className="flex items-center gap-1 mt-0.5 text-[6px] font-bold text-white/20 uppercase tracking-widest">
+                          <div className={`flex items-center gap-1 mt-0.5 text-[6px] font-bold ${textMuted} uppercase tracking-widest`}>
                             <Clock size={7} />
                             <span>{formatTime(m.tanggal)} • {m.petugas}</span>
                           </div>
@@ -209,10 +309,10 @@ const MutationList: React.FC<MutationListProps> = ({ mutations = [], nasabahList
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className={`text-[10px] font-black ${
-                          isIncome ? 'text-emerald-400' : 
-                          isTransport ? 'text-blue-400' : 
-                          isPenarikan ? 'text-orange-400' :
-                          isExpense ? 'text-red-400' : 'text-white/60'
+                          isIncome ? (currentTheme === 'light' ? 'text-emerald-600' : 'text-emerald-400') : 
+                          isTransport ? (currentTheme === 'light' ? 'text-blue-600' : 'text-blue-400') : 
+                          isPenarikan ? (currentTheme === 'light' ? 'text-orange-600' : 'text-orange-400') :
+                          isExpense ? (currentTheme === 'light' ? 'text-red-600' : 'text-red-400') : textMuted
                         }`}>
                           {isIncome ? '+' : isExpense ? '-' : ''} {m.jumlah.toLocaleString('id-ID')}
                         </p>

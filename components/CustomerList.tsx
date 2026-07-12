@@ -9,9 +9,15 @@ interface CustomerListProps {
   records: PinjamanAktif[];
   nasabahList: Nasabah[];
   onSelectCustomer: (nasabahId: string, loanId?: string) => void;
+  currentTheme?: string;
 }
 
-const CustomerList: React.FC<CustomerListProps> = ({ records, nasabahList, onSelectCustomer }) => {
+const CustomerList: React.FC<CustomerListProps> = ({ 
+  records, 
+  nasabahList, 
+  onSelectCustomer,
+  currentTheme = 'default'
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
   const customersList: any[] = [];
 
@@ -72,7 +78,7 @@ const CustomerList: React.FC<CustomerListProps> = ({ records, nasabahList, onSel
 
           if (hasOverdue) {
             status = 'DEBT';
-          } else if (hasToday || (sisa > 0 && sisa < totalContractValue)) {
+          } else if (hasToday) {
             status = 'DUE_TODAY';
           } else {
             status = 'SAFE';
@@ -111,6 +117,9 @@ const CustomerList: React.FC<CustomerListProps> = ({ records, nasabahList, onSel
     c.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const textPrimary = currentTheme === 'light' ? 'text-slate-800' : 'text-white';
+  const textMuted = currentTheme === 'light' ? 'text-slate-400' : 'text-white/40';
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -119,20 +128,20 @@ const CustomerList: React.FC<CustomerListProps> = ({ records, nasabahList, onSel
     >
       <div className="flex items-center justify-between px-1">
         <div>
-          <h2 className="text-xl font-black text-white tracking-tight">Database Nasabah</h2>
+          <h2 className={`text-xl font-black ${textPrimary} tracking-tight`}>Database Nasabah</h2>
           <p className="text-[8px] text-emerald-400 font-bold uppercase tracking-[0.2em]">Portfolio Management</p>
         </div>
-        <span className="text-[9px] font-black bg-white/10 text-emerald-400 border border-white/10 px-3 py-1 rounded-full">{nasabahList.length} Nasabah</span>
+        <span className={`text-[9px] font-black ${currentTheme === 'light' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-white/10 text-emerald-400 border-white/10'} border px-3 py-1 rounded-full`}>{nasabahList.length} Nasabah</span>
       </div>
 
       <div className="relative group px-1">
-        <Search size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-emerald-400 transition-colors" />
+        <Search size={14} className={`absolute left-5 top-1/2 -translate-y-1/2 ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/20'} group-focus-within:text-emerald-400 transition-colors`} />
         <input 
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Cari nama atau ID nasabah..."
-          className="w-full p-3.5 pl-11 bg-white/5 border border-white/10 rounded-2xl text-[11px] font-bold text-white outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-white/10"
+          className={`w-full p-3.5 pl-11 ${currentTheme === 'light' ? 'bg-white border-slate-200 text-slate-900 shadow-sm' : 'bg-white/5 border-white/10 text-white'} border rounded-2xl text-[11px] font-bold outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all placeholder:text-slate-300`}
         />
       </div>
 
@@ -153,35 +162,35 @@ const CustomerList: React.FC<CustomerListProps> = ({ records, nasabahList, onSel
               onClick={() => onSelectCustomer(customer.id, customer.loanId)}
               className={`backdrop-blur-md p-2.5 px-3.5 rounded-xl border transition-all flex items-center gap-3 cursor-pointer ${
                 isLunas || isNoLoan
-                  ? 'bg-white/5 border-white/10 opacity-40 grayscale'
+                  ? (currentTheme === 'light' ? 'bg-slate-50/50 border-slate-100 opacity-60 grayscale' : 'bg-white/5 border-white/10 opacity-40 grayscale')
                   : isDueToday
-                      ? 'bg-orange-500/10 border-orange-500/30 shadow-lg shadow-orange-500/10'
+                      ? (currentTheme === 'light' ? 'bg-orange-50 border-orange-100 shadow-sm shadow-orange-500/5' : 'bg-orange-500/10 border-orange-500/30 shadow-lg shadow-orange-500/10')
                       : isDebt 
-                        ? 'bg-gradient-to-r from-red-900/40 to-slate-900/40 border-red-500/50 shadow-lg shadow-red-500/10' 
-                        : 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/50'
+                        ? (currentTheme === 'light' ? 'bg-red-50 border-red-100 shadow-sm shadow-red-500/5' : 'bg-gradient-to-r from-red-900/40 to-slate-900/40 border-red-500/50 shadow-lg shadow-red-500/10') 
+                        : (currentTheme === 'light' ? 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm' : 'bg-emerald-500/5 border-emerald-500/10 hover:border-emerald-500/50')
               }`}
             >
               <div className={`w-8 h-8 rounded-lg border flex-shrink-0 flex items-center justify-center font-black text-xs ${
                 isLunas || isNoLoan
-                  ? 'bg-white/10 border-white/20 text-white/40'
+                  ? (currentTheme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white/10 border-white/20 text-white/40')
                   : isDueToday
                       ? 'bg-orange-500/20 border-orange-400/40 text-orange-400'
                       : isDebt 
-                        ? 'bg-red-500/20 border-red-500/40 text-red-400' 
-                        : 'bg-emerald-400/20 border-emerald-400/30 text-emerald-400'
+                        ? 'bg-red-500/20 border-red-500/40 text-red-500' 
+                        : 'bg-emerald-400/20 border-emerald-400/30 text-emerald-500'
               }`}>
                 {customer.name.charAt(0)}
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start">
-                  <h4 className="font-black text-[11px] pr-2 text-white truncate">
+                  <h4 className={`font-black text-[11px] pr-2 ${textPrimary} truncate`}>
                     {customer.name}
                   </h4>
                   {isLunas ? (
-                    <span className="text-[6px] font-black bg-white/20 text-white/60 px-1 py-0.5 rounded-sm uppercase tracking-tighter">LUNAS</span>
+                    <span className={`text-[6px] font-black ${currentTheme === 'light' ? 'bg-slate-200 text-slate-600' : 'bg-white/20 text-white/60'} px-1 py-0.5 rounded-sm uppercase tracking-tighter`}>LUNAS</span>
                   ) : isNoLoan ? (
-                    <span className="text-[6px] font-black bg-white/20 text-white/40 px-1 py-0.5 rounded-sm uppercase tracking-tighter">IDLE</span>
+                    <span className={`text-[6px] font-black ${currentTheme === 'light' ? 'bg-slate-200 text-slate-400' : 'bg-white/20 text-white/40'} px-1 py-0.5 rounded-sm uppercase tracking-tighter`}>IDLE</span>
                   ) : isDebt ? (
                     <span className="text-[6px] font-black bg-red-600 text-white px-1 py-0.5 rounded-sm uppercase tracking-tighter shadow-red-500/50">MACET</span>
                   ) : isDueToday ? (
@@ -192,25 +201,25 @@ const CustomerList: React.FC<CustomerListProps> = ({ records, nasabahList, onSel
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <p className="text-[8px] font-black text-white/30 uppercase tracking-tighter">
+                  <p className={`text-[8px] font-black ${textMuted} uppercase tracking-tighter`}>
                     {isLunas ? 'LUNAS' : isDebt ? 'MACET' : isNoLoan ? 'IDLE' : 'AMAN'}
                   </p>
-                  <p className="text-[8px] font-black text-white/30 uppercase tracking-tighter">
-                    <span className={isLunas ? 'text-white/40' : isDebt ? 'text-red-400' : isDueToday ? 'text-orange-400' : 'text-emerald-400'}>{customer.percentage}%</span>
+                  <p className={`text-[8px] font-black ${textMuted} uppercase tracking-tighter`}>
+                    <span className={isLunas ? 'text-slate-400' : isDebt ? 'text-red-500' : isDueToday ? 'text-orange-500' : 'text-emerald-600'}>{customer.percentage}%</span>
                   </p>
                 </div>
               </div>
 
-              <div className="w-10 h-1 bg-white/5 rounded-full overflow-hidden flex-shrink-0">
+              <div className={`w-10 h-1 ${currentTheme === 'light' ? 'bg-slate-100' : 'bg-white/5'} rounded-full overflow-hidden flex-shrink-0`}>
                 <motion.div 
                   initial={{ width: 0 }}
                   animate={{ width: `${customer.percentage}%` }}
                   transition={{ duration: 1, delay: idx * 0.02 }}
-                  className={`h-full rounded-full ${isLunas ? 'bg-white/20' : isDebt ? 'bg-red-500' : isDueToday ? 'bg-orange-500' : 'bg-emerald-400'}`} 
+                  className={`h-full rounded-full ${isLunas ? (currentTheme === 'light' ? 'bg-slate-300' : 'bg-white/20') : isDebt ? 'bg-red-500' : isDueToday ? 'bg-orange-500' : 'bg-emerald-400'}`} 
                 ></motion.div>
               </div>
               
-              <ChevronRight size={10} className={`${isLunas ? 'text-white/10' : isDebt ? 'text-red-400/30' : isDueToday ? 'text-orange-400/30' : 'text-white/20'}`} />
+              <ChevronRight size={10} className={`${isLunas ? (currentTheme === 'light' ? 'text-slate-200' : 'text-white/10') : isDebt ? 'text-red-400/30' : isDueToday ? 'text-orange-400/30' : 'text-white/20'}`} />
             </motion.div>
           );
         })}

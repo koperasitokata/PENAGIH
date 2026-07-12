@@ -14,13 +14,25 @@ interface InstallmentCardProps {
   records: PinjamanAktif[];
   mutations: Mutation[];
   onBack: () => void;
+  currentTheme?: string;
 }
 
-const InstallmentCard: React.FC<InstallmentCardProps> = ({ nasabahId, loanId, nasabahList, records, mutations, onBack }) => {
+const InstallmentCard: React.FC<InstallmentCardProps> = ({ 
+  nasabahId, 
+  loanId, 
+  nasabahList, 
+  records, 
+  mutations, 
+  onBack,
+  currentTheme = 'default'
+}) => {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [memberBalance, setMemberBalance] = useState<number | null>(null);
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<{ amount: number, photo?: string, date: string | Date } | null>(null);
+
+  const textPrimary = currentTheme === 'light' ? 'text-slate-800' : 'text-white';
+  const textMuted = currentTheme === 'light' ? 'text-slate-400' : 'text-white/40';
   
   const nasabah = nasabahList.find(n => n.id_nasabah === nasabahId);
   
@@ -89,12 +101,12 @@ const InstallmentCard: React.FC<InstallmentCardProps> = ({ nasabahId, loanId, na
         <motion.button 
           whileTap={{ scale: 0.9 }}
           onClick={onBack} 
-          className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center text-white/60"
+          className={`w-10 h-10 rounded-xl ${currentTheme === 'light' ? 'bg-slate-100 border-slate-200 text-slate-400' : 'bg-white/10 border-white/10 text-white/60'} border flex items-center justify-center shadow-sm`}
         >
           <ChevronLeft size={20} />
         </motion.button>
         <div className="text-center flex-1 min-w-0">
-          <h2 className="text-xl font-black text-white tracking-tight leading-tight uppercase truncate px-2">{nasabah.nama}</h2>
+          <h2 className={`text-xl font-black ${textPrimary} tracking-tight leading-tight uppercase truncate px-2`}>{nasabah.nama}</h2>
           <p className="text-[8px] text-emerald-400 font-bold uppercase tracking-[0.3em]">Profil Nasabah</p>
         </div>
         <div className="w-10"></div>
@@ -150,10 +162,10 @@ const InstallmentCard: React.FC<InstallmentCardProps> = ({ nasabahId, loanId, na
         </div>
       </motion.div>
 
-      <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] shadow-2xl space-y-6">
+      <div className={`${currentTheme === 'light' ? 'bg-white border-slate-100 shadow-sm' : 'bg-white/5 border-white/10 shadow-2xl'} backdrop-blur-xl border p-6 rounded-[2.5rem] space-y-6`}>
         <div className="flex items-center justify-between">
-          <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">Jadwal & Tiket Angsuran</h3>
-          <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-widest">Tenor {activeLoan?.tenor || 0} Hari</span>
+          <h3 className={`text-[10px] font-black ${textMuted} uppercase tracking-[0.2em]`}>Jadwal & Tiket Angsuran</h3>
+          <span className="text-[8px] font-black text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full uppercase tracking-widest">Tenor {activeLoan?.tenor || 0} Hari</span>
         </div>
         
         <div className="grid grid-cols-4 gap-2">
@@ -166,7 +178,7 @@ const InstallmentCard: React.FC<InstallmentCardProps> = ({ nasabahId, loanId, na
 
             if (isNaN(checkDate.getTime())) {
               return (
-                <div key={i} className="aspect-[3/4.8] rounded-xl border border-white/5 bg-white/5 flex items-center justify-center">
+                <div key={i} className={`aspect-[3/4.8] rounded-xl border ${currentTheme === 'light' ? 'border-slate-100 bg-slate-50' : 'border-white/5 bg-white/5'} flex items-center justify-center`}>
                   <p className="text-[6px] text-white/20">ERR</p>
                 </div>
               );
@@ -203,18 +215,18 @@ const InstallmentCard: React.FC<InstallmentCardProps> = ({ nasabahId, loanId, na
                 }}
                 className={`relative aspect-[3/4.8] rounded-xl border flex flex-col items-center justify-between py-2 transition-all overflow-hidden cursor-pointer ${
                   isActuallyPaid 
-                    ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' 
+                    ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-500' 
                     : isPartiallyPaid
-                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-400 shadow-[0_0_10px_rgba(245,158,11,0.1)]'
+                      ? 'bg-amber-500/20 border-amber-500/30 text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.1)]'
                       : isOverdue
-                        ? 'bg-red-500/20 border-red-500/30 text-red-400 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
+                        ? 'bg-red-500/20 border-red-500/30 text-red-500 shadow-[0_0_10px_rgba(239,68,68,0.2)]'
                         : isCurrent 
-                          ? 'bg-white/10 border-emerald-400 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
-                          : 'bg-white/5 border-white/5 text-white/20'
+                          ? `bg-white/10 border-emerald-400 ${currentTheme === 'light' ? 'text-slate-800' : 'text-white'} shadow-[0_0_10px_rgba(16,185,129,0.3)]` 
+                          : `${currentTheme === 'light' ? 'bg-slate-50 border-slate-100 text-slate-300' : 'bg-white/5 border-white/5 text-white/20'}`
                 }`}
               >
-                <div className="absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-slate-950 rounded-full border border-white/10"></div>
-                <div className="absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 bg-slate-950 rounded-full border border-white/10"></div>
+                <div className={`absolute -left-1.5 top-1/2 -translate-y-1/2 w-3 h-3 ${currentTheme === 'light' ? 'bg-white border-slate-200 shadow-inner' : 'bg-slate-950 border-white/10'} rounded-full border`}></div>
+                <div className={`absolute -right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 ${currentTheme === 'light' ? 'bg-white border-slate-200 shadow-inner' : 'bg-slate-950 border-white/10'} rounded-full border`}></div>
                 <div className="text-center">
                   <p className="text-[6px] font-black uppercase tracking-tighter opacity-60">{dayName}</p>
                   <p className="text-[8px] font-black leading-none">{dateStr}</p>
@@ -230,45 +242,45 @@ const InstallmentCard: React.FC<InstallmentCardProps> = ({ nasabahId, loanId, na
                   </p>
                   <p className="text-[4px] font-bold opacity-40">Sisa: {(remainingAfterThis / 1000).toFixed(0)}K</p>
                 </div>
-                {isActuallyPaid && <div className="absolute top-1 right-1"><CheckCircle size={8} className="text-emerald-400" /></div>}
-                {isPartiallyPaid && <div className="absolute top-1 right-1 animate-pulse"><Clock size={8} className="text-amber-400" /></div>}
-                {isOverdue && !isPartiallyPaid && <div className="absolute top-1 right-1 animate-pulse"><AlertTriangle size={8} className="text-red-400" /></div>}
-                {isCurrent && !isActuallyPaid && !isPartiallyPaid && <div className="absolute top-1 right-1"><Clock size={8} className="text-emerald-400" /></div>}
+                {isActuallyPaid && <div className="absolute top-1 right-1"><CheckCircle size={8} className="text-emerald-500" /></div>}
+                {isPartiallyPaid && <div className="absolute top-1 right-1 animate-pulse"><Clock size={8} className="text-amber-500" /></div>}
+                {isOverdue && !isPartiallyPaid && <div className="absolute top-1 right-1 animate-pulse"><AlertTriangle size={8} className="text-red-500" /></div>}
+                {isCurrent && !isActuallyPaid && !isPartiallyPaid && <div className="absolute top-1 right-1"><Clock size={8} className="text-emerald-500" /></div>}
               </motion.div>
             );
           }) : (
             <div className="col-span-4 py-8 text-center opacity-20">
-              <p className="text-[10px] font-black uppercase tracking-widest">Tidak ada jadwal aktif</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tidak ada jadwal aktif</p>
             </div>
           )}
         </div>
 
-        <div className="pt-4 border-t border-white/5 space-y-4">
-          <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center justify-between">
+        <div className="pt-4 border-t border-slate-100/10 space-y-4">
+          <div className={`${currentTheme === 'light' ? 'bg-emerald-50 border-emerald-100' : 'bg-emerald-500/10 border-emerald-500/20'} p-4 rounded-2xl flex items-center justify-between border shadow-sm`}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center text-emerald-500">
                 <Wallet size={20} />
               </div>
               <div>
-                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest">Saldo Simpanan</p>
-                <h4 className="text-lg font-black text-white">
+                <p className={`text-[8px] font-black ${textMuted} uppercase tracking-widest`}>Saldo Simpanan</p>
+                <h4 className={`text-lg font-black ${textPrimary}`}>
                   {isLoadingBalance ? '...' : `Rp ${(memberBalance || 0).toLocaleString()}`}
                 </h4>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-[7px] font-bold text-emerald-400 uppercase tracking-widest">Tersedia</p>
+              <p className="text-[7px] font-bold text-emerald-500 uppercase tracking-widest">Tersedia</p>
             </div>
           </div>
         </div>
       </div>
 
       {activeLoan && activeLoan.foto_bukti && (
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2.5rem] shadow-2xl">
-          <h3 className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-4">Foto Bukti Terakhir</h3>
+        <div className={`${currentTheme === 'light' ? 'bg-white border-slate-100 shadow-sm' : 'bg-white/5 border-white/10 shadow-2xl'} backdrop-blur-xl border p-6 rounded-[2.5rem]`}>
+          <h3 className={`text-[10px] font-black ${textMuted} uppercase tracking-[0.2em] mb-4`}>Foto Bukti Terakhir</h3>
           <div 
             onClick={() => setSelectedPhoto(activeLoan.foto_bukti)}
-            className="w-full h-48 rounded-3xl overflow-hidden border border-white/10 cursor-pointer hover:opacity-80 transition-all"
+            className={`w-full h-48 rounded-3xl overflow-hidden border ${currentTheme === 'light' ? 'border-slate-100' : 'border-white/10'} cursor-pointer hover:opacity-80 transition-all shadow-sm`}
           >
             <img src={activeLoan.foto_bukti} alt="Bukti" className="w-full h-full object-cover" />
           </div>

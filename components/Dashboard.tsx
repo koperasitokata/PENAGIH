@@ -15,6 +15,7 @@ interface DashboardProps {
   onSelectTarget: (name: string) => void;
   collector: PetugasProfile;
   accentColor?: string;
+  currentTheme?: string;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ 
@@ -24,7 +25,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   setView, 
   onSelectTarget, 
   collector,
-  accentColor = 'text-emerald-400'
+  accentColor = 'text-emerald-400',
+  currentTheme = 'default'
 }) => {
   const now = new Date();
   
@@ -95,26 +97,28 @@ const Dashboard: React.FC<DashboardProps> = ({
     const queue = records.filter(record => record.status === 'Aktif').map(record => {
       const schedule = generateLoanSchedule(record.tanggal, record.tenor);
       
-      // Cek apakah ada jadwal hari ini
-      const hasToday = schedule.some(date => {
-        const d = new Date(date);
-        d.setHours(0,0,0,0);
-        return d.getTime() === today.getTime();
-      });
-
-      // Cek apakah menunggak (ada jadwal di masa lalu yang belum terbayar)
-      // Logika: Jika (cicilan * jumlah_hari_lewat) > (total_bayar), maka menunggak
-      const pastScheduleCount = schedule.filter(date => {
-        const d = new Date(date);
-        d.setHours(0,0,0,0);
-        return d.getTime() < today.getTime();
-      }).length;
-
       const totalContractValue = record.pokok * (1 + (record.bunga_persen / 100));
       const totalPaid = totalContractValue - record.sisa_hutang;
-      const expectedPaid = record.cicilan * pastScheduleCount;
-      
-      const isOverdue = totalPaid < expectedPaid;
+
+      let hasToday = false;
+      let isOverdue = false;
+      const cicilan = record.cicilan || 0;
+
+      schedule.forEach((ticketDate, i) => {
+        const checkDate = new Date(ticketDate);
+        checkDate.setHours(0, 0, 0, 0);
+
+        const amountAllocated = Math.max(0, Math.min(cicilan, totalPaid - (i * cicilan)));
+        const isActuallyPaid = amountAllocated >= cicilan - 1; // Tolerance for rounding
+
+        if (!isActuallyPaid) {
+          if (checkDate < today) {
+            isOverdue = true;
+          } else if (checkDate.getTime() === today.getTime()) {
+            hasToday = true;
+          }
+        }
+      });
 
       return {
         ...record,
@@ -175,6 +179,11 @@ const Dashboard: React.FC<DashboardProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const textPrimary = currentTheme === 'light' ? 'text-slate-800' : 'text-white';
+  const textMuted = currentTheme === 'light' ? 'text-slate-400' : 'text-white/40';
+  const textSub = currentTheme === 'light' ? 'text-slate-300' : 'text-white/20';
+  const bgCard = currentTheme === 'light' ? 'bg-white border-slate-100 shadow-sm' : 'bg-slate-900/40 border-white/10 shadow-lg';
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -184,25 +193,25 @@ const Dashboard: React.FC<DashboardProps> = ({
       <section className="px-1 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div>
-            <h2 className="text-lg font-black text-white tracking-tight leading-none">{collector.nama}</h2>
+            <h2 className={`text-lg font-black ${textPrimary} tracking-tight leading-none`}>{collector.nama}</h2>
             <p className={`text-[7px] ${accentColor} font-bold uppercase tracking-[0.2em] mt-1`}>SINKRONISASI AKTIF</p>
           </div>
         </div>
-        <div className="bg-white/5 px-3 py-1 rounded-xl border border-white/10 text-right">
-           <p className="text-[6px] font-black text-white/40 uppercase tracking-widest">Nasabah Aktif</p>
-           <p className="text-[9px] font-bold text-white uppercase">{nasabahList.length} Orang</p>
+        <div className={`${currentTheme === 'light' ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'} px-3 py-1 rounded-xl border text-right`}>
+           <p className={`text-[6px] font-black ${currentTheme === 'light' ? 'text-slate-400' : 'text-white/40'} uppercase tracking-widest`}>Nasabah Aktif</p>
+           <p className={`text-[9px] font-bold ${currentTheme === 'light' ? 'text-slate-900' : 'text-white'} uppercase`}>{nasabahList.length} Orang</p>
         </div>
       </section>
 
       <div className="grid grid-cols-3 gap-2">
-        <section className="bg-slate-900/40 border border-white/10 p-2 rounded-2xl flex flex-col justify-between shadow-lg h-24">
+        <section className={`${bgCard} p-2 rounded-2xl flex flex-col justify-between h-24 border`}>
           <div className="flex items-center gap-1.5">
-            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${hasClaimedTransport ? `${accentColor.replace('text', 'bg')}/20 ${accentColor}` : isWeekend ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/20'}`}>
+            <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${hasClaimedTransport ? `${accentColor.replace('text', 'bg')}/20 ${accentColor}` : isWeekend ? 'bg-red-500/10 text-red-400' : (currentTheme === 'light' ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/20')}`}>
               {hasClaimedTransport ? <Check size={12} /> : isWeekend ? <CalendarX size={12} /> : <Bike size={12} />}
             </div>
             <div className="min-w-0">
-              <h4 className="text-[7px] font-black text-white uppercase tracking-widest leading-none truncate">Transport</h4>
-              <p className="text-[5px] font-bold text-white/30 uppercase mt-0.5">
+              <h4 className={`text-[7px] font-black ${textPrimary} uppercase tracking-widest leading-none truncate`}>Transport</h4>
+              <p className={`text-[5px] font-bold ${textMuted} uppercase mt-0.5`}>
                 {hasClaimedTransport ? 'OK' : isWeekend ? 'LIBUR' : 'SELFIE'}
               </p>
             </div>
@@ -215,7 +224,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               hasClaimedTransport 
                 ? `${accentColor.replace('text', 'bg')}/10 ${accentColor}` 
                 : isWeekend 
-                  ? 'bg-white/5 text-white/20 cursor-not-allowed border border-white/5'
+                  ? `${currentTheme === 'light' ? 'bg-slate-50 text-slate-300' : 'bg-white/5 text-white/20'} cursor-not-allowed border ${currentTheme === 'light' ? 'border-slate-100' : 'border-white/5'}`
                   : `${accentColor.replace('text', 'bg')} text-white shadow-lg`
             }`}
           >
@@ -224,14 +233,14 @@ const Dashboard: React.FC<DashboardProps> = ({
           <input type="file" ref={fileInputRef} onChange={handleTransportPhoto} accept="image/*" capture="user" className="hidden" />
         </section>
 
-        <section className="bg-slate-900/40 border border-blue-500/20 p-2 rounded-2xl flex flex-col justify-between shadow-lg h-24">
+        <section className={`${bgCard} border-blue-500/20 p-2 rounded-2xl flex flex-col justify-between h-24 border`}>
           <div className="flex items-center gap-1.5">
             <div className="w-6 h-6 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
               <Wallet size={12} />
             </div>
             <div className="min-w-0">
-              <h4 className="text-[7px] font-black text-white uppercase tracking-widest leading-none truncate">Simpanan</h4>
-              <p className="text-[5px] font-bold text-white/30 uppercase mt-0.5">CAIR TUNAI</p>
+              <h4 className={`text-[7px] font-black ${textPrimary} uppercase tracking-widest leading-none truncate`}>Simpanan</h4>
+              <p className={`text-[5px] font-bold ${textMuted} uppercase mt-0.5`}>CAIR TUNAI</p>
             </div>
           </div>
           <motion.button 
@@ -243,14 +252,14 @@ const Dashboard: React.FC<DashboardProps> = ({
           </motion.button>
         </section>
 
-        <section className="bg-slate-900/40 border border-purple-500/20 p-2 rounded-2xl flex flex-col justify-between shadow-lg h-24">
+        <section className={`${bgCard} border-purple-500/20 p-2 rounded-2xl flex flex-col justify-between h-24 border`}>
           <div className="flex items-center gap-1.5">
             <div className="w-6 h-6 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center">
               <Activity size={12} />
             </div>
             <div className="min-w-0">
-              <h4 className="text-[7px] font-black text-white uppercase tracking-widest leading-none truncate">Mutasi</h4>
-              <p className="text-[5px] font-bold text-white/30 uppercase mt-0.5">TRANSAKSI</p>
+              <h4 className={`text-[7px] font-black ${textPrimary} uppercase tracking-widest leading-none truncate`}>Mutasi</h4>
+              <p className={`text-[5px] font-bold ${textMuted} uppercase mt-0.5`}>TRANSAKSI</p>
             </div>
           </div>
           <motion.button 
@@ -265,11 +274,11 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <BannerCarousel />
 
-      <section className="bg-white/5 border border-white/10 p-5 rounded-[2rem] relative overflow-hidden">
+      <section className={`${currentTheme === 'light' ? 'bg-white border-slate-100' : 'bg-white/5 border-white/10'} border p-5 rounded-[2rem] relative overflow-hidden shadow-sm`}>
         <div className="flex justify-between items-end mb-3">
           <div>
-            <h3 className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em] mb-1">Setoran Hari Ini</h3>
-            <p className="text-xl font-black text-white">Rp {totalAmount.toLocaleString('id-ID')}</p>
+            <h3 className={`text-[8px] font-black ${textMuted} uppercase tracking-[0.4em] mb-1`}>Setoran Hari Ini</h3>
+            <p className={`text-xl font-black ${textPrimary}`}>Rp {totalAmount.toLocaleString('id-ID')}</p>
           </div>
           <div className="text-right">
             <div className={`flex items-center gap-1 ${accentColor}`}>
@@ -278,7 +287,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </div>
         </div>
-        <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden border border-white/5">
+        <div className={`w-full h-2 ${currentTheme === 'light' ? 'bg-slate-100' : 'bg-white/5'} rounded-full overflow-hidden border ${currentTheme === 'light' ? 'border-slate-50' : 'border-white/5'}`}>
            <motion.div 
              initial={{ width: 0 }}
              animate={{ width: `${targetPercentage}%` }}
@@ -290,14 +299,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <section className="space-y-3 pb-4">
         <div className="flex justify-between items-center px-2">
-           <h3 className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Antrian Penagihan</h3>
-           <span className="text-[7px] font-bold text-red-400 uppercase tracking-widest animate-pulse">{collectionQueue.length} AKTIF</span>
+           <h3 className={`text-[8px] font-black ${textMuted} uppercase tracking-[0.4em]`}>Antrian Penagihan</h3>
+           <span className="text-[7px] font-bold text-red-500 uppercase tracking-widest animate-pulse">{collectionQueue.length} AKTIF</span>
         </div>
         <div className="space-y-3">
           {collectionQueue.length === 0 ? (
-            <div className="bg-white/5 p-8 rounded-[1.5rem] border border-dashed border-white/10 text-center opacity-40">
+            <div className={`${currentTheme === 'light' ? 'bg-slate-50 border-slate-200' : 'bg-white/5 border-white/10'} p-8 rounded-[1.5rem] border border-dashed text-center opacity-40`}>
               <Check size={32} className="mx-auto mb-2 text-emerald-400" />
-              <p className="text-[9px] font-black uppercase tracking-widest">Tidak ada jadwal tagih hari ini</p>
+              <p className={`text-[9px] font-black uppercase tracking-widest ${textPrimary}`}>Tidak ada jadwal tagih hari ini</p>
             </div>
           ) : (
             collectionQueue.map((target, idx) => (
@@ -308,20 +317,20 @@ const Dashboard: React.FC<DashboardProps> = ({
                 className={`p-4 rounded-[1.5rem] border flex items-center justify-between transition-all cursor-pointer relative overflow-hidden group ${
                   target.isOverdue 
                     ? 'bg-red-500/10 border-red-500/20 shadow-lg shadow-red-500/5' 
-                    : 'bg-white/5 border-white/5'
+                    : (currentTheme === 'light' ? 'bg-white border-slate-100 shadow-sm' : 'bg-white/5 border-white/5')
                 }`}
               >
                 <div className="flex items-center gap-3 relative z-10">
                   <div className={`w-1 h-8 rounded-full shadow-[0_0_10px_currentColor] ${target.isOverdue ? 'bg-red-500 text-red-500' : 'bg-blue-500 text-blue-500'}`}></div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="text-[11px] font-black text-white truncate max-w-[140px] leading-none tracking-wide">{target.nama}</p>
+                      <p className={`text-[11px] font-black ${textPrimary} truncate max-w-[140px] leading-none tracking-wide`}>{target.nama}</p>
                       {target.isOverdue && (
                         <span className="text-[6px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded uppercase tracking-tighter">MENUNGGAK</span>
                       )}
                     </div>
                     <div className="flex items-center gap-1.5 mt-1.5">
-                       <p className="text-[8px] font-bold uppercase text-white/30">
+                       <p className={`text-[8px] font-bold uppercase ${textMuted}`}>
                          SISA: Rp {target.sisa_hutang.toLocaleString('id-ID')}
                        </p>
                     </div>
@@ -331,7 +340,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <span className={`text-[8px] font-black px-3 py-1.5 rounded-xl border shadow-lg ${
                     target.isOverdue 
                       ? 'bg-red-500 text-white border-red-500 shadow-red-500/20' 
-                      : `${accentColor.replace('text', 'bg')}/20 ${accentColor} ${accentColor.replace('text', 'border')}/20`
+                      : (currentTheme === 'light' 
+                          ? `bg-emerald-50 text-emerald-600 border-emerald-100` 
+                          : `${accentColor.replace('text', 'bg')}/20 ${accentColor} ${accentColor.replace('text', 'border')}/20`)
                   }`}>
                     TAGIH {Math.round(target.cicilan / 1000)}K
                   </span>
